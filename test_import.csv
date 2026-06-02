@@ -1,0 +1,6 @@
+student_email,student_firstname,student_lastname,student_id,student_grade,student_section,student_password,teacher_email,teacher_firstname,teacher_lastname,teacher_password,subject_name,quarter,year
+student1@school.edu,Juan,Dela Cruz,20001,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026
+student2@school.edu,Maria,Santos,20002,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026
+student3@school.edu,Jose,Reyes,20003,11,Block B,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026
+student4@school.edu,Ana,Garcia,20004,11,Block B,p@ss123,teacher2@test.com,John,Smith,t@ach456,Science,1,2026
+student5@school.edu,Carlo,Mendoza,20005,11,Block A,p@ss123,teacher2@test.com,John,Smith,t@ach456,Science,1,2026
