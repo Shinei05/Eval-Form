@@ -25,34 +25,22 @@ VALUES
     true,
     true,
     true
-  );
+  )
+ON CONFLICT (email) DO NOTHING;
 
 -- loginAdmin requires a teachers row linked by usr_id (firstname/lastname shown in admin UI)
 INSERT INTO teachers (firstname, lastname, subject, quarter, year, identifier, usr_id, is_elementary, is_jhs)
-VALUES
-  (
-    'Willy',
-    'Antigo',
-    NULL,
-    3,
-    2025,
-    'ADM4164397',
-    (SELECT id FROM users WHERE email = 'willy.antigo@deped.gov.ph' LIMIT 1),
-    false,
-    false
-  ),
-  (
-    'Joey',
-    'Manes',
-    NULL,
-    3,
-    2025,
-    'ADM5415434',
-    (SELECT id FROM users WHERE email = 'joey.manes@deped.gov.ph' LIMIT 1),
-    false,
-    false
-  );
+SELECT 'Willy', 'Antigo', NULL, 3, 2025, 'ADM4164397', u.id, false, false
+FROM users u
+WHERE u.email = 'willy.antigo@deped.gov.ph'
+  AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.usr_id = u.id);
 
-SELECT setval('teachers_id_seq', (SELECT MAX(id) FROM teachers));
+INSERT INTO teachers (firstname, lastname, subject, quarter, year, identifier, usr_id, is_elementary, is_jhs)
+SELECT 'Joey', 'Manes', NULL, 3, 2025, 'ADM5415434', u.id, false, false
+FROM users u
+WHERE u.email = 'joey.manes@deped.gov.ph'
+  AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.usr_id = u.id);
+
+SELECT setval('teachers_id_seq', COALESCE((SELECT MAX(id) FROM teachers), 1));
 
 COMMIT;
