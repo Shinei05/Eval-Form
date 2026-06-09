@@ -53,6 +53,7 @@ router.get("/api/health/details", async (req, res) => {
 			hasDatabaseUrl: !!process.env.DATABASE_URL,
 			hasCorsOrigin: !!process.env.CORS_ORIGIN,
 			nodeEnv: process.env.NODE_ENV || "development",
+			frontendUrl: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",")[0].trim() : "http://localhost:5173",
 		},
 	});
 });

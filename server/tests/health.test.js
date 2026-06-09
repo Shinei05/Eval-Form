@@ -27,7 +27,7 @@ describe("Health API and Dashboard", () => {
 
 		expect(res.headers["content-type"]).toContain("text/html");
 		expect(res.text).toContain("<!DOCTYPE html>");
-		expect(res.text).toContain("ProjectEVAL Status");
+		expect(res.text).toContain("System Diagnostics");
 	});
 
 	it("GET /api/health/details returns system statistics on database success", async () => {
