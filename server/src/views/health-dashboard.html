@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ProjectEVAL | Backend Health Dashboard</title>
+	<!-- Google Fonts -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+	
+	<style>
+		:root {
+			--bg-base: #090d16;
+			--bg-surface: rgba(17, 24, 39, 0.7);
+			--bg-surface-hover: rgba(26, 36, 56, 0.85);
+			--border-color: rgba(255, 255, 255, 0.08);
+			--border-focus: rgba(99, 102, 241, 0.5);
+			
+			--color-primary: #6366f1;
+			--color-primary-glow: rgba(99, 102, 241, 0.15);
+			--color-success: #10b981;
+			--color-success-glow: rgba(16, 185, 129, 0.15);
+			--color-warning: #f59e0b;
+			--color-warning-glow: rgba(245, 158, 11, 0.15);
+			--color-danger: #ef4444;
+			--color-danger-glow: rgba(239, 68, 68, 0.15);
+			
+			--text-main: #f3f4f6;
+			--text-muted: #9ca3af;
+			--text-dark: #6b7280;
+			
+			--font-heading: 'Outfit', sans-serif;
+			--font-body: 'Inter', sans-serif;
+			--font-mono: 'JetBrains Mono', monospace;
+			
+			--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+			--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+			--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+			--shadow-glow: 0 0 20px rgba(99, 102, 241, 0.25);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+			transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+		}
+
+		body {
+			background-color: var(--bg-base);
+			background-image: 
+				radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+				radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.03) 0%, transparent 40%);
+			background-attachment: fixed;
+			color: var(--text-main);
+			font-family: var(--font-body);
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			overflow-x: hidden;
+		}
+
+		/* Typography */
+		h1, h2, h3, h4 {
+			font-family: var(--font-heading);
+			font-weight: 600;
+			letter-spacing: -0.02em;
+		}
+
+		/* Container */
+		.dashboard-container {
+			max-width: 1200px;
+			width: 100%;
+			margin: 0 auto;
+			padding: 2rem 1.5rem;
+			flex: 1;
+		}
+
+		/* Header */
+		header {
+			display: flex;
+			flex-direction: column;
+			gap: 1rem;
+			margin-bottom: 2.5rem;
+		}
+
+		@media (min-width: 768px) {
+			header {
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+			}
+		}
+
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+		}
+
+		.brand-logo {
+			width: 42px;
+			height: 42px;
+			background: linear-gradient(135deg, var(--color-primary), #4f46e5);
+			border-radius: 12px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			box-shadow: var(--shadow-glow);
+		}
+
+		.brand-logo svg {
+			width: 24px;
+			height: 24px;
+			fill: white;
+		}
+
+		.brand-info h1 {
+			font-size: 1.5rem;
+			background: linear-gradient(to right, #ffffff, #c7d2fe);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.brand-info p {
+			font-size: 0.875rem;
+			color: var(--text-muted);
+		}
+
+		/* Connection Config Panel */
+		.config-panel {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 0.75rem;
+			background: var(--bg-surface);
+			border: 1px solid var(--border-color);
+			padding: 0.5rem 1rem;
+			border-radius: 12px;
+			backdrop-filter: blur(8px);
+		}
+
+		.input-group {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.input-group label {
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			font-weight: 500;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.input-group input {
+			background: rgba(0, 0, 0, 0.3);
+			border: 1px solid var(--border-color);
+			color: var(--text-main);
+			padding: 0.375rem 0.75rem;
+			border-radius: 8px;
+			font-family: var(--font-mono);
+			font-size: 0.85rem;
+			width: 280px;
+		}
+
+		.input-group input:focus {
+			outline: none;
+			border-color: var(--border-focus);
+			box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+		}
+
+		.badge {
+			font-size: 0.75rem;
+			font-weight: 600;
+			padding: 0.25rem 0.5rem;
+			border-radius: 6px;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.25rem;
+		}
+
+		.badge-prod {
+			background-color: var(--color-primary-glow);
+			color: #a5b4fc;
+			border: 1px solid rgba(99, 102, 241, 0.3);
+		}
+
+		.badge-local {
+			background-color: var(--color-warning-glow);
+			color: #fcd34d;
+			border: 1px solid rgba(245, 158, 11, 0.3);
+		}
+
+		/* Main Grid */
+		.dashboard-grid {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+			margin-bottom: 2.5rem;
+		}
+
+		@media (min-width: 640px) {
+			.dashboard-grid {
+				grid-template-columns: repeat(2, 1fr);
+			}
+		}
+
+		@media (min-width: 1024px) {
+			.dashboard-grid {
+				grid-template-columns: repeat(4, 1fr);
+			}
+		}
+
+		/* Card Styles */
+		.card {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-color);
+			border-radius: 16px;
+			padding: 1.5rem;
+			display: flex;
+			flex-direction: column;
+			position: relative;
+			overflow: hidden;
+			backdrop-filter: blur(12px);
+			box-shadow: var(--shadow-md);
+		}
+
+		.card::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 3px;
+			background: transparent;
+		}
+
+		.card.card-primary::before { background: var(--color-primary); }
+		.card.card-success::before { background: var(--color-success); }
+		.card.card-warning::before { background: var(--color-warning); }
+		.card.card-danger::before { background: var(--color-danger); }
+
+		.card:hover {
+			background: var(--bg-surface-hover);
+			border-color: rgba(255, 255, 255, 0.12);
+			box-shadow: var(--shadow-lg);
+			transform: translateY(-2px);
+		}
+
+		.card-header-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 1rem;
+		}
+
+		.card-title {
+			font-size: 0.85rem;
+			color: var(--text-muted);
+			font-weight: 500;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.card-icon {
+			width: 32px;
+			height: 32px;
+			border-radius: 8px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(255, 255, 255, 0.04);
+		}
+
+		.card-icon svg {
+			width: 18px;
+			height: 18px;
+			fill: var(--text-muted);
+		}
+
+		.card-primary .card-icon svg { fill: var(--color-primary); }
+		.card-success .card-icon svg { fill: var(--color-success); }
+		.card-warning .card-icon svg { fill: var(--color-warning); }
+		.card-danger .card-icon svg { fill: var(--color-danger); }
+
+		.card-value {
+			font-size: 1.75rem;
+			font-weight: 700;
+			margin-bottom: 0.25rem;
+			color: #ffffff;
+			font-family: var(--font-heading);
+			display: flex;
+			align-items: baseline;
+			gap: 0.25rem;
+		}
+
+		.card-subtext {
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			display: flex;
+			align-items: center;
+			gap: 0.35rem;
+		}
+
+		/* Status specific indicators */
+		.status-pulse {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			display: inline-block;
+			background-color: var(--text-dark);
+		}
+
+		.status-pulse.online {
+			background-color: var(--color-success);
+			box-shadow: 0 0 10px var(--color-success);
+			animation: pulse 2s infinite;
+		}
+
+		.status-pulse.offline {
+			background-color: var(--color-danger);
+			box-shadow: 0 0 10px var(--color-danger);
+		}
+
+		.status-pulse.checking {
+			background-color: var(--color-warning);
+			box-shadow: 0 0 10px var(--color-warning);
+			animation: pulse 1s infinite;
+		}
+
+		@keyframes pulse {
+			0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+			70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+			100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+		}
+
+		/* Keep Alive & Control Panel */
+		.control-panel {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+			margin-bottom: 2.5rem;
+		}
+
+		@media (min-width: 1024px) {
+			.control-panel {
+				grid-template-columns: 1.5fr 1fr;
+			}
+		}
+
+		.panel-card {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-color);
+			border-radius: 16px;
+			padding: 1.5rem;
+			backdrop-filter: blur(12px);
+			box-shadow: var(--shadow-md);
+		}
+
+		.panel-title {
+			font-size: 1.1rem;
+			font-weight: 600;
+			margin-bottom: 1.25rem;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			color: #ffffff;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 0.75rem;
+		}
+
+		.panel-title svg {
+			width: 20px;
+			height: 20px;
+			fill: var(--color-primary);
+		}
+
+		/* Flex Controls */
+		.row-controls {
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+		}
+
+		.control-item {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0.75rem 1rem;
+			background: rgba(0, 0, 0, 0.2);
+			border: 1px solid var(--border-color);
+			border-radius: 12px;
+		}
+
+		.control-info h4 {
+			font-size: 0.95rem;
+			margin-bottom: 0.25rem;
+			color: #ffffff;
+		}
+
+		.control-info p {
+			font-size: 0.8rem;
+			color: var(--text-muted);
+		}
+
+		/* Toggle Switch */
+		.switch {
+			position: relative;
+			display: inline-block;
+			width: 48px;
+			height: 24px;
+		}
+
+		.switch input {
+			opacity: 0;
+			width: 0;
+			height: 0;
+		}
+
+		.slider {
+			position: absolute;
+			cursor: pointer;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: #374151;
+			border-radius: 34px;
+			transition: .3s;
+		}
+
+		.slider:before {
+			position: absolute;
+			content: "";
+			height: 18px;
+			width: 18px;
+			left: 3px;
+			bottom: 3px;
+			background-color: white;
+			border-radius: 50%;
+			transition: .3s;
+		}
+
+		input:checked + .slider {
+			background-color: var(--color-success);
+		}
+
+		input:focus + .slider {
+			box-shadow: 0 0 1px var(--color-success);
+		}
+
+		input:checked + .slider:before {
+			transform: translateX(24px);
+		}
+
+		/* Buttons */
+		.btn {
+			background-color: rgba(255, 255, 255, 0.08);
+			border: 1px solid var(--border-color);
+			color: var(--text-main);
+			padding: 0.625rem 1.25rem;
+			border-radius: 10px;
+			font-weight: 500;
+			font-size: 0.9rem;
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5rem;
+			font-family: var(--font-body);
+		}
+
+		.btn:hover {
+			background-color: rgba(255, 255, 255, 0.14);
+			border-color: rgba(255, 255, 255, 0.2);
+		}
+
+		.btn:active {
+			transform: scale(0.98);
+		}
+
+		.btn-primary {
+			background: linear-gradient(135deg, var(--color-primary), #4f46e5);
+			border: none;
+			color: white;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.btn-primary:hover {
+			background: linear-gradient(135deg, #4f46e5, #4338ca);
+			box-shadow: var(--shadow-glow);
+		}
+
+		.btn-success {
+			background: linear-gradient(135deg, var(--color-success), #059669);
+			border: none;
+			color: white;
+		}
+
+		.btn-success:hover {
+			background: linear-gradient(135deg, #059669, #047857);
+		}
+
+		.btn:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+			transform: none;
+		}
+
+		/* Wake Up Progress Indicator */
+		.wakeup-container {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 1rem 0;
+			text-align: center;
+		}
+
+		.progress-ring-container {
+			position: relative;
+			width: 120px;
+			height: 120px;
+			margin-bottom: 1rem;
+		}
+
+		.progress-ring {
+			transform: rotate(-90deg);
+		}
+
+		.progress-ring__circle {
+			transition: stroke-dashoffset 0.3s;
+			transform-origin: 50% 50%;
+		}
+
+		.progress-value {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			font-family: var(--font-heading);
+			font-size: 1.5rem;
+			font-weight: 700;
+			color: #ffffff;
+		}
+
+		/* Memory Gauges */
+		.memory-usage-container {
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+		}
+
+		.gauge-group {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+
+		.gauge-header {
+			display: flex;
+			justify-content: space-between;
+			font-size: 0.75rem;
+			color: var(--text-muted);
+		}
+
+		.gauge-bar-bg {
+			height: 8px;
+			background-color: rgba(255, 255, 255, 0.05);
+			border-radius: 4px;
+			overflow: hidden;
+			position: relative;
+			border: 1px solid rgba(255, 255, 255, 0.03);
+		}
+
+		.gauge-bar-fill {
+			height: 100%;
+			border-radius: 4px;
+			width: 0%;
+			background: linear-gradient(to right, var(--color-primary), #818cf8);
+		}
+
+		/* System logs table */
+		.logs-panel {
+			background: var(--bg-surface);
+			border: 1px solid var(--border-color);
+			border-radius: 16px;
+			padding: 1.5rem;
+			backdrop-filter: blur(12px);
+			box-shadow: var(--shadow-md);
+		}
+
+		.table-wrapper {
+			overflow-x: auto;
+			margin-top: 1rem;
+			border: 1px solid var(--border-color);
+			border-radius: 10px;
+			background: rgba(0, 0, 0, 0.2);
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			text-align: left;
+			font-size: 0.85rem;
+		}
+
+		th, td {
+			padding: 0.75rem 1rem;
+			border-bottom: 1px solid var(--border-color);
+		}
+
+		th {
+			background: rgba(255, 255, 255, 0.02);
+			font-family: var(--font-heading);
+			font-weight: 600;
+			color: var(--text-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			font-size: 0.75rem;
+		}
+
+		tr:last-child td {
+			border-bottom: none;
+		}
+
+		tr:hover td {
+			background: rgba(255, 255, 255, 0.01);
+		}
+
+		.log-status {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			font-weight: 500;
+		}
+
+		.log-status-success { color: var(--color-success); }
+		.log-status-error { color: var(--color-danger); }
+		.log-status-warn { color: var(--color-warning); }
+
+		/* Toasts */
+		.toast-container {
+			position: fixed;
+			bottom: 1.5rem;
+			right: 1.5rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+			z-index: 1000;
+		}
+
+		.toast {
+			background: rgba(17, 24, 39, 0.95);
+			border: 1px solid var(--border-color);
+			padding: 1rem;
+			border-radius: 12px;
+			box-shadow: var(--shadow-lg);
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			min-width: 300px;
+			max-width: 450px;
+			animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+			backdrop-filter: blur(16px);
+		}
+
+		.toast.toast-success { border-left: 4px solid var(--color-success); }
+		.toast.toast-error { border-left: 4px solid var(--color-danger); }
+		.toast.toast-warning { border-left: 4px solid var(--color-warning); }
+		.toast.toast-info { border-left: 4px solid var(--color-primary); }
+
+		.toast-icon {
+			width: 24px;
+			height: 24px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.toast-icon svg {
+			width: 20px;
+			height: 20px;
+		}
+
+		.toast-success .toast-icon svg { fill: var(--color-success); }
+		.toast-error .toast-icon svg { fill: var(--color-danger); }
+		.toast-warning .toast-icon svg { fill: var(--color-warning); }
+		.toast-info .toast-icon svg { fill: var(--color-primary); }
+
+		.toast-content h4 {
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: #ffffff;
+		}
+
+		.toast-content p {
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			margin-top: 0.15rem;
+		}
+
+		@keyframes slideIn {
+			from { transform: translateX(100%); opacity: 0; }
+			to { transform: translateX(0); opacity: 1; }
+		}
+
+		/* Footer */
+		footer {
+			margin-top: auto;
+			padding: 2rem 0;
+			text-align: center;
+			font-size: 0.75rem;
+			color: var(--text-dark);
+			border-top: 1px solid var(--border-color);
+			background: rgba(0,0,0,0.15);
+		}
+
+		.footer-logo {
+			font-family: var(--font-heading);
+			font-weight: 700;
+			letter-spacing: 0.05em;
+			margin-bottom: 0.5rem;
+			color: var(--text-muted);
+		}
+
+		/* Helpers */
+		.text-mono {
+			font-family: var(--font-mono);
+		}
+
+		.pulse-circle {
+			width: 8px;
+			height: 8px;
+			background-color: var(--text-muted);
+			border-radius: 50%;
+		}
+
+		.pulse-circle.active {
+			background-color: var(--color-success);
+			animation: dotPulse 1.5s infinite alternate;
+		}
+
+		@keyframes dotPulse {
+			from { opacity: 0.4; }
+			to { opacity: 1; }
+		}
+	</style>
+</head>
+<body>
+
+	<div class="dashboard-container">
+		
+		<!-- Header Section -->
+		<header>
+			<div class="brand">
+				<div class="brand-logo">
+					<!-- Heartbeat Icon -->
+					<svg viewBox="0 0 24 24">
+						<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+					</svg>
+				</div>
+				<div class="brand-info">
+					<h1>ProjectEVAL Status</h1>
+					<p>Backend Operations & Infrastructure Control</p>
+				</div>
+			</div>
+
+			<div class="config-panel">
+				<div class="input-group">
+					<label for="target-url">Target API</label>
+					<input type="text" id="target-url" placeholder="https://eval-form-b9hh.onrender.com">
+				</div>
+				<div id="env-badge" class="badge badge-prod">PROD</div>
+			</div>
+		</header>
+
+		<!-- Overview Metrics Grid -->
+		<section class="dashboard-grid">
+			
+			<!-- Server Status Card -->
+			<div class="card card-primary" id="card-server-status">
+				<div class="card-header-row">
+					<span class="card-title">Server Status</span>
+					<div class="card-icon">
+						<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+					</div>
+				</div>
+				<div class="card-value" id="val-server-status">
+					<span class="status-pulse checking" id="pulse-server"></span>
+					<span id="text-server-status">Ping...</span>
+				</div>
+				<div class="card-subtext">
+					<span>Latency:</span>
+					<span id="val-server-latency" class="text-mono">0 ms</span>
+				</div>
+			</div>
+
+			<!-- Database Status Card -->
+			<div class="card card-primary" id="card-db-status">
+				<div class="card-header-row">
+					<span class="card-title">Supabase Pool</span>
+					<div class="card-icon">
+						<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.02 2 6.5v11c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zm0 18c-4.42 0-8-1.57-8-3.5v-2.18c1.79.87 4.67 1.43 8 1.43s6.21-.56 8-1.43v2.18c0 1.93-3.58 3.5-8 3.5zm0-5c-4.42 0-8-1.57-8-3.5v-2.18c1.79.87 4.67 1.43 8 1.43s6.21-.56 8-1.43v2.18c0 1.93-3.58 3.5-8 3.5zm0-5c-4.42 0-8-1.57-8-3.5S7.58 3 12 3s8 1.57 8 3.5-3.58 3.5-8 3.5z"/></svg>
+					</div>
+				</div>
+				<div class="card-value" id="val-db-status">
+					<span class="status-pulse" id="pulse-db"></span>
+					<span id="text-db-status">Checking...</span>
+				</div>
+				<div class="card-subtext">
+					<span>DB Ping:</span>
+					<span id="val-db-latency" class="text-mono">0 ms</span>
+				</div>
+			</div>
+
+			<!-- Memory Footprint Card -->
+			<div class="card card-primary" id="card-memory">
+				<div class="card-header-row">
+					<span class="card-title">Memory Footprint</span>
+					<div class="card-icon">
+						<svg viewBox="0 0 24 24"><path d="M19 5h-2V3h-2v2H9V3H7v2H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 14H5V7h14v12zm-5-6H7v-2h7v2zm3 4H7v-2h10v2z"/></svg>
+					</div>
+				</div>
+				<div class="card-value" id="val-memory-usage">
+					<span id="text-memory-used">0</span> <span style="font-size: 0.95rem; font-weight: 500; color: var(--text-muted);">MB</span>
+				</div>
+				<div class="card-subtext">
+					<span>RSS Heap Size:</span>
+					<span id="val-memory-rss" class="text-mono">0 MB</span>
+				</div>
+			</div>
+
+			<!-- Uptime Card -->
+			<div class="card card-primary" id="card-uptime">
+				<div class="card-header-row">
+					<span class="card-title">Process Uptime</span>
+					<div class="card-icon">
+						<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+					</div>
+				</div>
+				<div class="card-value" id="val-uptime" style="font-size: 1.45rem;">
+					<span>00d 00h 00m</span>
+				</div>
+				<div class="card-subtext">
+					<span>Since Last Boot:</span>
+					<span id="val-boot-time" class="text-mono">Connecting...</span>
+				</div>
+			</div>
+
+		</section>
+
+		<!-- Control Panel & Diagnostics -->
+		<section class="control-panel">
+			
+			<!-- Actions and Keep-Alive Panel -->
+			<div class="panel-card">
+				<h2 class="panel-title">
+					<svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+					Dashboard Controls
+				</h2>
+				
+				<div class="row-controls">
+					
+					<!-- Wake Up Render Card -->
+					<div class="control-item">
+						<div class="control-info">
+							<h4>Render Wake Up Trigger</h4>
+							<p>Sends aggressive boot pings if Render has spun down the application container.</p>
+						</div>
+						<div>
+							<button id="btn-wakeup" class="btn btn-primary">
+								<svg style="width:16px;height:16px;fill:white;" viewBox="0 0 24 24"><path d="M12.01 21.49L23.64 7c-.45-.34-4.93-4-11.64-4C5.28 3 .81 6.66.36 7l11.63 14.49.01.01.01-.01z"/></svg>
+								Wake Up Server
+							</button>
+						</div>
+					</div>
+
+					<!-- Keep Alive Switch -->
+					<div class="control-item">
+						<div class="control-info">
+							<h4>Auto-Ping (Keep Alive)</h4>
+							<p>Pings backend every 10 minutes to prevent container dormancy.</p>
+						</div>
+						<div style="display: flex; align-items: center; gap: 0.75rem;">
+							<span id="text-keepalive-timer" class="text-mono" style="font-size: 0.8rem; color: var(--color-success);"></span>
+							<label class="switch">
+								<input type="checkbox" id="toggle-keepalive">
+								<span class="slider"></span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Refresh Interval Selector -->
+					<div class="control-item">
+						<div class="control-info">
+							<h4>Live Telemetry Interval</h4>
+							<p>Adjust how frequently the dashboard requests updated stats.</p>
+						</div>
+						<div style="display: flex; gap: 0.5rem;">
+							<button class="btn btn-sm btn-interval active" data-sec="15">15s</button>
+							<button class="btn btn-sm btn-interval" data-sec="30">30s</button>
+							<button class="btn btn-sm btn-interval" data-sec="60">60s</button>
+							<button id="btn-pause" class="btn btn-sm" title="Pause Monitoring">
+								<svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+							</button>
+						</div>
+					</div>
+
+				</div>
+			</div>
+
+			<!-- Memory details & graphs -->
+			<div class="panel-card" id="panel-memory-breakdown">
+				<h2 class="panel-title">
+					<svg viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V18c0 .55.45 1 1 1h5c.55 0 1-.45 1-1v-5.03C15.34 12.84 17 11.12 17 9V2h-2v7h-2V2h-2v7z"/></svg>
+					Memory Allocation
+				</h2>
+
+				<!-- Active Wake Up Loading Circle -->
+				<div id="wakeup-progress-panel" class="wakeup-container" style="display: none;">
+					<div class="progress-ring-container">
+						<svg class="progress-ring" width="120" height="120">
+							<circle class="progress-ring__circle" stroke="#374151" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
+							<circle class="progress-ring__circle" id="progress-indicator" stroke="var(--color-primary)" stroke-width="8" fill="transparent" r="52" cx="60" cy="60" stroke-linecap="round"/>
+						</svg>
+						<div class="progress-value" id="progress-timer">50s</div>
+					</div>
+					<h3 id="wakeup-title">Booting Container</h3>
+					<p id="wakeup-desc" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Waiting for Render to provision resources...</p>
+				</div>
+
+				<div class="memory-usage-container" id="memory-bars-container">
+					<!-- Heap Used -->
+					<div class="gauge-group">
+						<div class="gauge-header">
+							<span>Heap Used</span>
+							<span id="text-heap-used-pct" class="text-mono">0% (0 / 0 MB)</span>
+						</div>
+						<div class="gauge-bar-bg">
+							<div class="gauge-bar-fill" id="bar-heap-used"></div>
+						</div>
+					</div>
+					
+					<!-- Heap Total -->
+					<div class="gauge-group">
+						<div class="gauge-header">
+							<span>Heap Committed</span>
+							<span id="text-heap-total-pct" class="text-mono">0% (0 / 0 MB)</span>
+						</div>
+						<div class="gauge-bar-bg">
+							<div class="gauge-bar-fill" id="bar-heap-total" style="background: linear-gradient(to right, #818cf8, #a5b4fc);"></div>
+						</div>
+					</div>
+
+					<!-- External -->
+					<div class="gauge-group">
+						<div class="gauge-header">
+							<span>External C/C++ Binding</span>
+							<span id="text-external" class="text-mono">0 MB</span>
+						</div>
+						<div class="gauge-bar-bg">
+							<div class="gauge-bar-fill" id="bar-external" style="background: linear-gradient(to right, #34d399, #6ee7b7); width: 100%;"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+		</section>
+
+		<!-- History log table -->
+		<section class="logs-panel">
+			<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+				<h2 class="panel-title" style="border-bottom: none; padding-bottom: 0; margin-bottom: 0;">
+					<svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+					Ping History Log
+				</h2>
+				<div style="display: flex; gap: 0.5rem;">
+					<button id="btn-export-log" class="btn btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Export CSV</button>
+					<button id="btn-clear-log" class="btn btn-sm" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Clear</button>
+				</div>
+			</div>
+			
+			<div class="table-wrapper">
+				<table id="table-logs">
+					<thead>
+						<tr>
+							<th>Timestamp</th>
+							<th>Endpoint</th>
+							<th>Response Time</th>
+							<th>Server Status</th>
+							<th>Database Status</th>
+						</tr>
+					</thead>
+					<tbody id="logs-tbody">
+						<!-- Dynamically populated -->
+						<tr>
+							<td colspan="5" style="text-align: center; color: var(--text-dark); padding: 2rem 0;">No diagnostic logs recorded yet. Waiting for first ping.</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</section>
+
+	</div>
+
+	<!-- Toasts Container -->
+	<div class="toast-container" id="toast-container"></div>
+
+	<!-- Footer -->
+	<footer>
+		<div class="footer-logo">PROJECTEVAL</div>
+		<p>&copy; 2026 Admin Panel &bull; Monitoring and Health Diagnostics System</p>
+	</footer>
+
+	<script>
+		// State Management
+		const state = {
+			targetUrl: '',
+			isMonitoring: true,
+			monitorIntervalSec: 15,
+			monitorTimerId: null,
+			uptimeTimerId: null,
+			keepAliveTimerId: null,
+			keepAliveCountdownId: null,
+			keepAliveCountdownVal: 600, // 10 minutes in seconds
+			isWakingUp: false,
+			wakeUpTimerId: null,
+			wakeUpProgress: 0,
+			wakeUpDuration: 50, // 50 seconds simulated Render boot time
+			pingHistory: [],
+			serverUptimeSeconds: 0,
+			serverBootTime: null
+		};
+
+		// UI Elements
+		const elements = {
+			targetUrlInput: document.getElementById('target-url'),
+			envBadge: document.getElementById('env-badge'),
+			
+			// Cards
+			cardServerStatus: document.getElementById('card-server-status'),
+			cardDbStatus: document.getElementById('card-db-status'),
+			cardMemory: document.getElementById('card-memory'),
+			cardUptime: document.getElementById('card-uptime'),
+			
+			// Value fields
+			textServerStatus: document.getElementById('text-server-status'),
+			pulseServer: document.getElementById('pulse-server'),
+			valServerLatency: document.getElementById('val-server-latency'),
+			
+			textDbStatus: document.getElementById('text-db-status'),
+			pulseDb: document.getElementById('pulse-db'),
+			valDbLatency: document.getElementById('val-db-latency'),
+			
+			textMemoryUsed: document.getElementById('text-memory-used'),
+			valMemoryRss: document.getElementById('val-memory-rss'),
+			
+			valUptime: document.getElementById('val-uptime'),
+			valBootTime: document.getElementById('val-boot-time'),
+			
+			// Buttons & Switches
+			btnWakeUp: document.getElementById('btn-wakeup'),
+			toggleKeepAlive: document.getElementById('toggle-keepalive'),
+			textKeepAliveTimer: document.getElementById('text-keepalive-timer'),
+			btnPause: document.getElementById('btn-pause'),
+			btnExportLog: document.getElementById('btn-export-log'),
+			btnClearLog: document.getElementById('btn-clear-log'),
+			
+			// Panels
+			panelMemoryBars: document.getElementById('memory-bars-container'),
+			panelWakeUpProgress: document.getElementById('wakeup-progress-panel'),
+			progressIndicator: document.getElementById('progress-indicator'),
+			progressTimer: document.getElementById('progress-timer'),
+			
+			// Memory detailed bars
+			barHeapUsed: document.getElementById('bar-heap-used'),
+			textHeapUsedPct: document.getElementById('text-heap-used-pct'),
+			barHeapTotal: document.getElementById('bar-heap-total'),
+			textHeapTotalPct: document.getElementById('text-heap-total-pct'),
+			barExternal: document.getElementById('bar-external'),
+			textExternal: document.getElementById('text-external'),
+			
+			// Logs
+			logsTbody: document.getElementById('logs-tbody'),
+			toastContainer: document.getElementById('toast-container')
+		};
+
+		// Circular progress setup
+		const radius = elements.progressIndicator.r.baseVal.value;
+		const circumference = radius * 2 * Math.PI;
+		elements.progressIndicator.style.strokeDasharray = `${circumference} ${circumference}`;
+		elements.progressIndicator.style.strokeDashoffset = circumference;
+
+		function setProgress(percent) {
+			const offset = circumference - (percent / 100) * circumference;
+			elements.progressIndicator.style.strokeDashoffset = offset;
+		}
+
+		// Initialize State & Event Listeners
+		function init() {
+			// Resolve target url
+			let defaultUrl = window.location.origin;
+			if (!defaultUrl || defaultUrl.startsWith('file://') || defaultUrl.includes('localhost:5173') || defaultUrl.includes('127.0.0.1')) {
+				defaultUrl = 'https://eval-form-b9hh.onrender.com';
+			}
+			state.targetUrl = defaultUrl;
+			elements.targetUrlInput.value = defaultUrl;
+			
+			// Update badge based on target
+			updateEnvBadge(defaultUrl);
+
+			// Add event listeners
+			elements.targetUrlInput.addEventListener('change', (e) => {
+				let val = e.target.value.trim();
+				if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
+					val = 'https://' + val;
+					elements.targetUrlInput.value = val;
+				}
+				state.targetUrl = val || window.location.origin;
+				updateEnvBadge(state.targetUrl);
+				showToast('Info', `Target monitoring URL updated to: ${state.targetUrl}`, 'info');
+				triggerDiagnostics();
+			});
+
+			elements.btnWakeUp.addEventListener('click', triggerWakeUp);
+			elements.toggleKeepAlive.addEventListener('change', handleKeepAliveToggle);
+			
+			// Interval buttons
+			document.querySelectorAll('.btn-interval').forEach(btn => {
+				btn.addEventListener('click', (e) => {
+					document.querySelectorAll('.btn-interval').forEach(b => b.classList.remove('active'));
+					e.target.classList.add('active');
+					state.monitorIntervalSec = parseInt(e.target.dataset.sec, 10);
+					state.isMonitoring = true;
+					elements.btnPause.innerHTML = `<svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+					elements.btnPause.title = "Pause Monitoring";
+					showToast('Info', `Checking frequency updated to every ${state.monitorIntervalSec}s`, 'info');
+					startMonitoring();
+				});
+			});
+
+			// Pause/Play Button
+			elements.btnPause.addEventListener('click', () => {
+				state.isMonitoring = !state.isMonitoring;
+				if (state.isMonitoring) {
+					elements.btnPause.innerHTML = `<svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+					elements.btnPause.title = "Pause Monitoring";
+					startMonitoring();
+					showToast('Success', 'Monitoring resumed', 'success');
+				} else {
+					elements.btnPause.innerHTML = `<svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+					elements.btnPause.title = "Resume Monitoring";
+					stopMonitoring();
+					showToast('Warning', 'Monitoring paused', 'warning');
+				}
+			});
+
+			elements.btnClearLog.addEventListener('click', () => {
+				state.pingHistory = [];
+				renderLogs();
+				showToast('Info', 'Diagnostic history log cleared', 'info');
+			});
+
+			elements.btnExportLog.addEventListener('click', exportLogsToCSV);
+
+			// Start processes
+			triggerDiagnostics();
+			startMonitoring();
+			startUptimeClock();
+		}
+
+		// Update Environment Badge
+		function updateEnvBadge(url) {
+			elements.envBadge.className = 'badge';
+			if (url.includes('localhost') || url.includes('127.0.0.1') || url.includes('192.168.')) {
+				elements.envBadge.textContent = 'LOCAL';
+				elements.envBadge.classList.add('badge-local');
+			} else {
+				elements.envBadge.textContent = 'PROD';
+				elements.envBadge.classList.add('badge-prod');
+			}
+		}
+
+		// Perform diagnostics
+		async function triggerDiagnostics() {
+			if (state.isWakingUp) return;
+
+			updateServerPulse('checking', 'Checking...');
+			const timestamp = new Date().toISOString();
+			const start = Date.now();
+
+			try {
+				const res = await fetch(`${state.targetUrl}/api/health/details`, {
+					method: 'GET',
+					headers: { 'Accept': 'application/json' },
+					mode: 'cors'
+				});
+
+				const latency = Date.now() - start;
+
+				if (res.ok) {
+					const data = await res.json();
+					updateDashboardData(data, latency);
+					addLogEntry({
+						timestamp,
+						endpoint: '/api/health/details',
+						latency: `${latency} ms`,
+						serverStatus: 'Online',
+						dbStatus: data.database ? data.database.status : 'unknown',
+						isSuccess: true
+					});
+				} else {
+					throw new Error(`HTTP Error ${res.status}`);
+				}
+			} catch (err) {
+				const latency = Date.now() - start;
+				handleOfflineState(latency, err.message);
+				addLogEntry({
+					timestamp,
+					endpoint: '/api/health/details',
+					latency: `${latency} ms`,
+					serverStatus: 'Offline',
+					dbStatus: 'error',
+					isSuccess: false
+				});
+			}
+		}
+
+		// Update dashboard elements with fresh API details
+		function updateDashboardData(data, latency) {
+			// Server Status Card
+			updateServerPulse('online', 'Online');
+			elements.valServerLatency.textContent = `${latency} ms`;
+			elements.cardServerStatus.className = 'card card-success';
+
+			// DB Status Card
+			if (data.database && data.database.status === 'connected') {
+				elements.pulseDb.className = 'status-pulse online';
+				elements.textDbStatus.textContent = 'Connected';
+				elements.valDbLatency.textContent = `${data.database.latencyMs} ms`;
+				elements.cardDbStatus.className = 'card card-success';
+			} else {
+				elements.pulseDb.className = 'status-pulse offline';
+				elements.textDbStatus.textContent = 'Disconnected';
+				elements.valDbLatency.textContent = 'N/A';
+				elements.cardDbStatus.className = 'card card-danger';
+				
+				const errorMsg = data.database ? data.database.error : 'Connection error';
+				showToast('Database Error', `Supabase connection failed: ${errorMsg}`, 'error');
+			}
+
+			// Memory Usage Card
+			const rssMB = Math.round(data.memory.rss / (1024 * 1024));
+			const heapUsedMB = Math.round(data.memory.heapUsed / (1024 * 1024));
+			const heapTotalMB = Math.round(data.memory.heapTotal / (1024 * 1024));
+			const externalMB = Math.round((data.memory.external || 0) / (1024 * 1024));
+
+			elements.textMemoryUsed.textContent = heapUsedMB;
+			elements.valMemoryRss.textContent = `${rssMB} MB`;
+			elements.cardMemory.className = 'card card-primary';
+			
+			// Show memory breakdown bars
+			elements.panelMemoryBars.style.display = 'flex';
+			elements.panelWakeUpProgress.style.display = 'none';
+
+			// Update bars
+			const heapUsedPct = Math.round((heapUsedMB / Math.max(heapTotalMB, 1)) * 100);
+			elements.barHeapUsed.style.width = `${heapUsedPct}%`;
+			elements.textHeapUsedPct.textContent = `${heapUsedPct}% (${heapUsedMB} / ${heapTotalMB} MB)`;
+
+			const maxAllocated = 512; // Render default Node memory cap estimation
+			const heapTotalPct = Math.round((heapTotalMB / maxAllocated) * 100);
+			elements.barHeapTotal.style.width = `${Math.min(heapTotalPct, 100)}%`;
+			elements.textHeapTotalPct.textContent = `${heapTotalPct}% (${heapTotalMB} / ${maxAllocated} MB)`;
+
+			elements.textExternal.textContent = `${externalMB} MB`;
+
+			// Uptime Card
+			state.serverUptimeSeconds = data.uptime;
+			
+			const bootDate = new Date(Date.now() - (data.uptime * 1000));
+			state.serverBootTime = bootDate;
+			elements.valBootTime.textContent = formatDateTime(bootDate);
+			elements.cardUptime.className = 'card card-primary';
+			updateUptimeUI();
+		}
+
+		// Handle server offline/sleeping state
+		function handleOfflineState(latency, errMsg) {
+			updateServerPulse('offline', 'Offline');
+			elements.valServerLatency.textContent = 'TIMEOUT';
+			elements.cardServerStatus.className = 'card card-danger';
+
+			elements.pulseDb.className = 'status-pulse';
+			elements.textDbStatus.textContent = 'Offline';
+			elements.valDbLatency.textContent = 'N/A';
+			elements.cardDbStatus.className = 'card card-danger';
+
+			elements.textMemoryUsed.textContent = 'N/A';
+			elements.valMemoryRss.textContent = 'N/A';
+			elements.cardMemory.className = 'card card-danger';
+
+			elements.valUptime.textContent = 'Offline';
+			elements.valBootTime.textContent = 'N/A';
+			elements.cardUptime.className = 'card card-danger';
+
+			state.serverBootTime = null;
+
+			// Check if we should suggest triggering wake up
+			showToast('Server Offline', `Could not connect to backend: ${errMsg}. If this is a Render free tier deployment, it may be spun down.`, 'error');
+		}
+
+		// Update Server Pulse indicator
+		function updateServerPulse(status, text) {
+			elements.pulseServer.className = `status-pulse ${status}`;
+			elements.textServerStatus.textContent = text;
+		}
+
+		// Formatter helpers
+		function formatDateTime(date) {
+			return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + date.toLocaleDateString();
+		}
+
+		function formatUptime(totalSeconds) {
+			const d = Math.floor(totalSeconds / (3600 * 24));
+			const h = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+			const m = Math.floor((totalSeconds % 3600) / 60);
+			const s = Math.floor(totalSeconds % 60);
+			
+			const dStr = d > 0 ? `${d}d ` : '';
+			const hStr = h > 0 || d > 0 ? `${String(h).padStart(2, '0')}h ` : '';
+			const mStr = `${String(m).padStart(2, '0')}m `;
+			const sStr = `${String(s).padStart(2, '0')}s`;
+			
+			return dStr + hStr + mStr + sStr;
+		}
+
+		// Active Wake Up Routine
+		function triggerWakeUp() {
+			if (state.isWakingUp) return;
+
+			state.isWakingUp = true;
+			elements.btnWakeUp.disabled = true;
+			
+			// Show progress ring and hide memory layout
+			elements.panelMemoryBars.style.display = 'none';
+			elements.panelWakeUpProgress.style.display = 'flex';
+			
+			// Reset progress bar
+			setProgress(100);
+			state.wakeUpProgress = 0;
+			elements.progressTimer.textContent = `${state.wakeUpDuration}s`;
+			
+			// Show Toast
+			showToast('Wake Up Initiated', 'Sending keep-alive pings to Render. Waiting for container boot...', 'info');
+
+			let countdown = state.wakeUpDuration;
+			
+			// Setup progress countdown
+			state.wakeUpTimerId = setInterval(async () => {
+				countdown--;
+				state.wakeUpProgress = ((state.wakeUpDuration - countdown) / state.wakeUpDuration) * 100;
+				setProgress(100 - state.wakeUpProgress);
+				elements.progressTimer.textContent = `${countdown}s`;
+
+				// Every 4 seconds, send a ping request to see if the server has woken up
+				if (countdown % 4 === 0 || countdown === 0) {
+					try {
+						const res = await fetch(`${state.targetUrl}/api/health`, { method: 'GET', mode: 'cors' });
+						if (res.ok) {
+							// Success! Server is awake.
+							clearInterval(state.wakeUpTimerId);
+							completeWakeUp(true);
+						}
+					} catch (e) {
+						// Quietly catch errors while waiting for boot
+					}
+				}
+
+				if (countdown <= 0) {
+					clearInterval(state.wakeUpTimerId);
+					// Check one final time
+					try {
+						const res = await fetch(`${state.targetUrl}/api/health`, { method: 'GET', mode: 'cors' });
+						if (res.ok) {
+							completeWakeUp(true);
+						} else {
+							completeWakeUp(false);
+						}
+					} catch (e) {
+						completeWakeUp(false);
+					}
+				}
+			}, 1000);
+		}
+
+		// Complete the Wake Up process
+		function completeWakeUp(success) {
+			state.isWakingUp = false;
+			elements.btnWakeUp.disabled = false;
+			
+			// Restore layout
+			elements.panelWakeUpProgress.style.display = 'none';
+			elements.panelMemoryBars.style.display = 'flex';
+			
+			if (success) {
+				showToast('Server Online', 'The Render backend service is awake and online!', 'success');
+				triggerDiagnostics();
+			} else {
+				showToast('Wake Up Failed', 'The server did not respond within the estimated time. Please try again or check the Render console.', 'error');
+				triggerDiagnostics();
+			}
+		}
+
+		// Keep Alive (Auto-Ping) Toggle handler
+		function handleKeepAliveToggle(e) {
+			if (e.target.checked) {
+				// Turn ON Keep Alive
+				showToast('Keep-Alive Enabled', 'Render keep-alive loop started. Pinging every 10 minutes.', 'success');
+				startKeepAliveLoop();
+			} else {
+				// Turn OFF Keep Alive
+				stopKeepAliveLoop();
+				showToast('Keep-Alive Disabled', 'Auto-ping disabled. The container will spin down normally.', 'warning');
+			}
+		}
+
+		// Run Keep Alive Loop
+		function startKeepAliveLoop() {
+			stopKeepAliveLoop(); // Clean existing
+			
+			state.keepAliveCountdownVal = 600; // 10 minutes in seconds
+			elements.textKeepAliveTimer.textContent = `Ping in 10:00`;
+
+			// Countdown timer updating every second
+			state.keepAliveCountdownId = setInterval(() => {
+				state.keepAliveCountdownVal--;
+				
+				const m = Math.floor(state.keepAliveCountdownVal / 60);
+				const s = state.keepAliveCountdownVal % 60;
+				elements.textKeepAliveTimer.textContent = `Ping in ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+				
+				if (state.keepAliveCountdownVal <= 0) {
+					// Trigger keep alive ping
+					pingKeepAlive();
+					state.keepAliveCountdownVal = 600; // Reset
+				}
+			}, 1000);
+		}
+
+		function stopKeepAliveLoop() {
+			if (state.keepAliveCountdownId) clearInterval(state.keepAliveCountdownId);
+			if (state.keepAliveTimerId) clearInterval(state.keepAliveTimerId);
+			elements.textKeepAliveTimer.textContent = '';
+		}
+
+		// Perform Keep Alive Ping
+		async function pingKeepAlive() {
+			showToast('Keep-Alive Ping', 'Sending keep-alive ping to prevent Render container sleep...', 'info');
+			try {
+				const res = await fetch(`${state.targetUrl}/api/health`, { method: 'GET', mode: 'cors' });
+				if (res.ok) {
+					showToast('Keep-Alive Success', 'Keep-alive ping acknowledged by backend.', 'success');
+					triggerDiagnostics(); // Refresh metrics
+				} else {
+					showToast('Keep-Alive Warning', 'Keep-alive ping returned non-200 response.', 'warning');
+				}
+			} catch (err) {
+				showToast('Keep-Alive Failed', 'Could not reach server for keep-alive ping.', 'error');
+			}
+		}
+
+		// Start interval monitoring
+		function startMonitoring() {
+			stopMonitoring(); // Clean existing
+			state.monitorTimerId = setInterval(triggerDiagnostics, state.monitorIntervalSec * 1000);
+		}
+
+		function stopMonitoring() {
+			if (state.monitorTimerId) {
+				clearInterval(state.monitorTimerId);
+			}
+		}
+
+		// Realtime Uptime Counter
+		function startUptimeClock() {
+			if (state.uptimeTimerId) clearInterval(state.uptimeTimerId);
+			
+			state.uptimeTimerId = setInterval(() => {
+				if (state.serverBootTime) {
+					state.serverUptimeSeconds++;
+					updateUptimeUI();
+				}
+			}, 1000);
+		}
+
+		function updateUptimeUI() {
+			if (state.serverBootTime) {
+				elements.valUptime.textContent = formatUptime(state.serverUptimeSeconds);
+			} else {
+				elements.valUptime.textContent = 'Offline';
+			}
+		}
+
+		// Log History Operations
+		function addLogEntry(entry) {
+			// Limit history to 50 items
+			if (state.pingHistory.length >= 50) {
+				state.pingHistory.pop();
+			}
+			state.pingHistory.unshift(entry);
+			renderLogs();
+		}
+
+		function renderLogs() {
+			if (state.pingHistory.length === 0) {
+				elements.logsTbody.innerHTML = `
+					<tr>
+						<td colspan="5" style="text-align: center; color: var(--text-dark); padding: 2rem 0;">No diagnostic logs recorded yet. Waiting for first ping.</td>
+					</tr>`;
+				return;
+			}
+
+			elements.logsTbody.innerHTML = state.pingHistory.map(log => {
+				const timeStr = new Date(log.timestamp).toLocaleTimeString();
+				const statusClass = log.isSuccess ? 'log-status-success' : 'log-status-error';
+				const dbClass = log.dbStatus === 'connected' ? 'log-status-success' : (log.dbStatus === 'error' ? 'log-status-error' : 'log-status-warn');
+				
+				return `
+					<tr>
+						<td>${log.timestamp.replace('T', ' ').substring(0, 19)}</td>
+						<td class="text-mono">${log.endpoint}</td>
+						<td class="text-mono">${log.latency}</td>
+						<td><span class="log-status ${statusClass}"><span class="status-pulse ${log.isSuccess ? 'online' : 'offline'}" style="width:6px;height:6px;"></span> ${log.serverStatus}</span></td>
+						<td><span class="log-status ${dbClass}">${log.dbStatus.toUpperCase()}</span></td>
+					</tr>
+				`;
+			}).join('');
+		}
+
+		function exportLogsToCSV() {
+			if (state.pingHistory.length === 0) {
+				showToast('Export Error', 'No diagnostic logs to export', 'error');
+				return;
+			}
+
+			let csvContent = "data:text/csv;charset=utf-8,";
+			csvContent += "Timestamp,Endpoint,Latency,Server Status,Database Status\n";
+			
+			state.pingHistory.forEach(log => {
+				csvContent += `${log.timestamp},${log.endpoint},${log.latency},${log.serverStatus},${log.dbStatus}\n`;
+			});
+
+			const encodedUri = encodeURI(csvContent);
+			const link = document.createElement("a");
+			link.setAttribute("href", encodedUri);
+			link.setAttribute("download", `projecteval_health_log_${new Date().toISOString().substring(0, 10)}.csv`);
+			document.body.appendChild(link); // Required for FF
+			link.click();
+			document.body.removeChild(link);
+			showToast('Export Success', 'Health logs downloaded successfully as CSV', 'success');
+		}
+
+		// Toast Notification System
+		function showToast(title, message, type = 'info') {
+			const toast = document.createElement('div');
+			toast.className = `toast toast-${type}`;
+			
+			let iconSvg = '';
+			if (type === 'success') {
+				iconSvg = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`;
+			} else if (type === 'error') {
+				iconSvg = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+			} else if (type === 'warning') {
+				iconSvg = `<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`;
+			} else { // info
+				iconSvg = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>`;
+			}
+
+			toast.innerHTML = `
+				<div class="toast-icon">${iconSvg}</div>
+				<div class="toast-content">
+					<h4>${title}</h4>
+					<p>${message}</p>
+				</div>
+			`;
+
+			elements.toastContainer.appendChild(toast);
+			
+			// Remove toast after 4.5 seconds
+			setTimeout(() => {
+				toast.style.animation = 'slideIn 0.3s reverse';
+				toast.style.opacity = '0';
+				setTimeout(() => {
+					if (toast.parentNode === elements.toastContainer) {
+						elements.toastContainer.removeChild(toast);
+					}
+				}, 300);
+			}, 4500);
+		}
+
+		// Run setup
+		window.addEventListener('DOMContentLoaded', init);
+	</script>
+</body>
+</html>

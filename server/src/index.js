@@ -10,6 +10,7 @@ import evaluationsRoutes from "./routes/evaluations.routes.js";
 import teachersRoutes from "./routes/teachers.routes.js";
 import studentsRoutes from "./routes/students.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import healthRoutes from "./routes/health.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -40,10 +41,11 @@ app.use(
 	morgan(":method :url :status :response-time ms - :res[content-length]"),
 );
 
-// ─── Health check ────────────────────────────────────────────
+// ─── Health check & Dashboard ────────────────────────────────
 app.get("/api/health", (_req, res) => {
 	res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+app.use("/", healthRoutes);
 
 // ─── API routes ──────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
