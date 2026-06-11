@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import LoadingOverlay from "../../components/LoadingOverlay.vue";
@@ -25,9 +25,11 @@ const newQuestion = ref("");
 const showAddHeader = ref(false);
 
 // API endpoints based on type
+// Use the "-all" variants for admin so displayed questions are not filtered
+// by header_version and match exactly what is stored in the database.
 const endpoints = {
 	student: {
-		questions: API.questionsStudent,
+		questions: API.questionsStudentAll,
 		headerUpdate: API.headerUpdate,
 		headerAdd: API.headerAdd,
 		headerDelete: API.headerDelete,
@@ -36,7 +38,7 @@ const endpoints = {
 		questionAdd: API.questionAdd,
 	},
 	teacher: {
-		questions: API.questionsTeacher,
+		questions: API.questionsTeacherAll,
 		headerUpdate: API.headerUpdateTeacher,
 		headerAdd: API.headerAddTeacher,
 		headerDelete: API.headerDeleteTeacher,
@@ -46,10 +48,12 @@ const endpoints = {
 	},
 };
 
-const api = endpoints[props.type] || endpoints.student;
+// Use computed so this always reflects the current type when the route changes
+// between student and teacher pages (Vue reuses the same component instance).
+const api = computed(() => endpoints[props.type] || endpoints.student);
 
 async function fetchQuestions() {
-	const result = await request(api.questions, {
+	const result = await request(api.value.questions, {
 		body: { action: "getQuestions" },
 	});
 	if (result.success) {
@@ -64,7 +68,7 @@ async function fetchQuestions() {
 
 async function updateHeader(header) {
 	header.editing = false;
-	const result = await request(api.headerUpdate, {
+	const result = await request(api.value.headerUpdate, {
 		body: {
 			action: "changeHeaders",
 			id: header.header_id,
@@ -81,7 +85,7 @@ async function updateHeader(header) {
 
 async function addHeader() {
 	if (!newHeader.value.trim()) return;
-	const result = await request(api.headerAdd, {
+	const result = await request(api.value.headerAdd, {
 		body: {
 			action: "addHeader",
 			header: newHeader.value,
@@ -100,7 +104,7 @@ async function addHeader() {
 
 async function deleteHeader(headerId) {
 	if (!confirm("Delete this entire section and all its questions?")) return;
-	const result = await request(api.headerDelete, {
+	const result = await request(api.value.headerDelete, {
 		body: { action: "deleteHeader", header_id: headerId },
 	});
 	if (result.success) {
@@ -113,7 +117,7 @@ async function deleteHeader(headerId) {
 
 async function updateQuestion(question) {
 	question.editing = false;
-	const result = await request(api.questionUpdate, {
+	const result = await request(api.value.questionUpdate, {
 		body: {
 			action: "chQuestions",
 			id: question.question_id,
@@ -130,7 +134,7 @@ async function updateQuestion(question) {
 
 async function deleteQuestion(qId) {
 	if (!confirm("Delete this question?")) return;
-	const result = await request(api.questionDelete, {
+	const result = await request(api.value.questionDelete, {
 		body: { action: "delQuestion", id: qId },
 	});
 	if (result.success) {
@@ -143,7 +147,7 @@ async function deleteQuestion(qId) {
 
 async function addQuestion(headerId) {
 	if (!newQuestion.value.trim()) return;
-	const result = await request(api.questionAdd, {
+	const result = await request(api.value.questionAdd, {
 		body: {
 			action: "addQuestion",
 			question: newQuestion.value,
@@ -161,6 +165,18 @@ async function addQuestion(headerId) {
 		notify("Failed to add question", "error");
 	}
 }
+
+// Re-fetch when navigating between student and teacher question pages.
+// Vue reuses the same component instance so props.type can change without
+// unmounting — the watch ensures each page loads its own question set.
+watch(
+	() => props.type,
+	() => {
+		headers.value = [];
+		headerVersion.value = null;
+		fetchQuestions();
+	},
+);
 
 onMounted(() => {
 	if (!requireAuth()) return;

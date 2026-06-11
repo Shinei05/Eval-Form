@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/supabase.js";
-import { getRandomString } from "../utils/helpers.js";
-import { sendEmail } from "../utils/email.js";
+import { getRandomString, getCurrentPeriod } from "../utils/helpers.js";
+import { sendEmail, sendBulkEmail } from "../utils/email.js";
 import { aiSummarize } from "../utils/ai.js";
 
 const ELEMENTARY_GRADES = new Set(["4", "5", "6"]);
@@ -315,26 +315,7 @@ export async function getSchedule(req, res) {
 	}
 }
 
-function getCurrentPeriod(schedule) {
-	const now = new Date();
-	for (let i = 1; i <= 4; i += 1) {
-		const dateStart = schedule[`p${i}_date_start`];
-		const timeStart = schedule[`p${i}_time_start`];
-		const dateEnd = schedule[`p${i}_date_end`];
-		const timeEnd = schedule[`p${i}_time_end`];
-		if (!dateStart || !timeStart || !dateEnd || !timeEnd) {
-			continue;
-		}
-		const startDate = new Date(`${dateStart}T${timeStart}`);
-		const endDate = new Date(`${dateEnd}T${timeEnd}`);
-		if (now >= startDate && now <= endDate) {
-			return i;
-		}
-	}
-	return 0;
-}
-
-//  Set schedule & notify via email
+//  Set (or overwrite) a schedule period & notify via email
 export async function setSchedule(req, res) {
 	try {
 		const periodNumber = Number(req.body.period);
@@ -366,25 +347,9 @@ export async function setSchedule(req, res) {
 			"SELECT * FROM schedules WHERE is_deleted = false ORDER BY id DESC LIMIT 1",
 		);
 		const current = rows[0] || null;
-		const fields = {
-			date_start,
-			time_start,
-			date_end,
-			time_end,
-		};
 
 		if (current) {
-			const existingStart = current[`p${periodNumber}_date_start`];
-			const existingEnd = current[`p${periodNumber}_date_end`];
-			const existingTimeStart = current[`p${periodNumber}_time_start`];
-			const existingTimeEnd = current[`p${periodNumber}_time_end`];
-			if (existingStart || existingEnd || existingTimeStart || existingTimeEnd) {
-				return res.status(400).json({
-					success: false,
-					message: "Schedule already set for this period",
-				});
-			}
-
+			// Always UPDATE — periods can now be edited/overwritten
 			await pool.query(
 				`UPDATE schedules SET
 					school_year = $1,
@@ -393,20 +358,13 @@ export async function setSchedule(req, res) {
 					p${periodNumber}_time_end = $4,
 					p${periodNumber}_date_end = $5
 				WHERE id = $6`,
-				[
-					schoolYear,
-					fields.time_start,
-					fields.date_start,
-					fields.time_end,
-					fields.date_end,
-					current.id,
-				],
+				[schoolYear, time_start, date_start, time_end, date_end, current.id],
 			);
 		} else {
 			await pool.query(
 				`INSERT INTO schedules (school_year, p${periodNumber}_time_start, p${periodNumber}_date_start, p${periodNumber}_time_end, p${periodNumber}_date_end, is_deleted)
 				 VALUES ($1, $2, $3, $4, $5, false)`,
-				[schoolYear, fields.time_start, fields.date_start, fields.time_end, fields.date_end],
+				[schoolYear, time_start, date_start, time_end, date_end],
 			);
 		}
 
@@ -440,22 +398,61 @@ export async function setSchedule(req, res) {
 
 		const altBody = `Evaluations has begun. School Year: ${periodLine.schoolYear}. ${periodLine.label} Period: ${periodLine.startDate} ${periodLine.startTime} - ${periodLine.endDate} ${periodLine.endTime}`;
 
-		// Get all active user emails
+		// Get all active user emails and send via BCC (fire-and-forget)
 		const { rows: users } = await pool.query(
 			"SELECT email FROM users WHERE is_deleted = false",
 		);
-
-		const emails = (users || []).map((u) => ({ email: u.email }));
-
-		// Send mass notification (fire-and-forget)
-		if (emails.length > 0) {
-			const allRecipients = emails.map((e) => e.email);
-			sendEmail(allRecipients, html, altBody).catch((err) =>
-				console.error("Mass email error:", err.message),
-			);
+		const allRecipients = (users || []).map((u) => u.email);
+		if (allRecipients.length > 0) {
+			sendBulkEmail(
+				allRecipients,
+				`EduRate — ${label} Period Evaluation Now Open`,
+				html,
+				altBody,
+			).catch((err) => console.error("Bulk email error:", err.message));
 		}
 
-		return res.json({ success: true, emails });
+		return res.json({ success: true });
+	} catch (err) {
+		return res
+			.status(500)
+			.json({ success: false, error: "Internal server error" });
+	}
+}
+
+//  Reset (clear) a specific schedule period
+export async function resetSchedule(req, res) {
+	try {
+		const periodNumber = Number(req.body.period);
+
+		if (![1, 2, 3, 4].includes(periodNumber)) {
+			return res
+				.status(400)
+				.json({ success: false, message: "Invalid period" });
+		}
+
+		const { rows } = await pool.query(
+			"SELECT id FROM schedules WHERE is_deleted = false ORDER BY id DESC LIMIT 1",
+		);
+		const current = rows[0];
+
+		if (!current) {
+			return res
+				.status(404)
+				.json({ success: false, message: "No schedule found" });
+		}
+
+		await pool.query(
+			`UPDATE schedules SET
+				p${periodNumber}_date_start = NULL,
+				p${periodNumber}_time_start = NULL,
+				p${periodNumber}_date_end = NULL,
+				p${periodNumber}_time_end = NULL
+			WHERE id = $1`,
+			[current.id],
+		);
+
+		return res.json({ success: true });
 	} catch (err) {
 		return res
 			.status(500)

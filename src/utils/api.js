@@ -73,6 +73,7 @@ const API = {
 	subjects: `${API_BASE}/admin/subjects`,
 	schedule: `${API_BASE}/admin/schedule`,
 	setSchedule: `${API_BASE}/admin/set-schedule`,
+	resetSchedule: `${API_BASE}/admin/reset-schedule`,
 	aiSummary: `${API_BASE}/admin/ai-summary`,
 	exportCSV: `${API_BASE}/admin/export`,
 	exportTeacherReport: `${API_BASE}/admin/export-teacher`,

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "../config/supabase.js";
-import { getRandomString } from "../utils/helpers.js";
+import { getRandomString, getCurrentPeriod } from "../utils/helpers.js";
 import { sendEmail } from "../utils/email.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "eval";
@@ -111,32 +111,6 @@ export async function getProfile(req, res) {
 	}
 }
 
-async function checkScheduleIsActive() {
-	const { rows: schedRows } = await pool.query(
-		"SELECT * FROM schedules WHERE is_deleted = false ORDER BY id DESC LIMIT 1",
-	);
-	const schedule = schedRows[0];
-	if (!schedule) return { active: false, currentPeriod: 0 };
-
-	const now = new Date();
-	for (let i = 1; i <= 4; i += 1) {
-		const dateStart = schedule[`p${i}_date_start`];
-		const timeStart = schedule[`p${i}_time_start`];
-		const dateEnd = schedule[`p${i}_date_end`];
-		const timeEnd = schedule[`p${i}_time_end`];
-		if (!dateStart || !timeStart || !dateEnd || !timeEnd) {
-			continue;
-		}
-		const startDate = new Date(`${dateStart}T${timeStart}`);
-		const endDate = new Date(`${dateEnd}T${timeEnd}`);
-		if (now >= startDate && now <= endDate) {
-			return { active: true, currentPeriod: i };
-		}
-	}
-
-	return { active: false, currentPeriod: 0 };
-}
-
 //  Student login
 export async function loginStudent(req, res) {
 	try {
@@ -155,16 +129,21 @@ export async function loginStudent(req, res) {
 				.json({ success: false, error: "Email not found" });
 		}
 
-		const scheduleStatus = await checkScheduleIsActive();
-		if (!scheduleStatus.active) {
-			return res.json({ success: true, scheduleClosed: true });
-		}
-
+		// Verify password first
 		const valid = await bcrypt.compare(password, user.password);
 		if (!valid) {
 			return res
 				.status(400)
 				.json({ success: false, error: "Password error" });
+		}
+
+		// Then check if an evaluation period is active
+		const { rows: schedRows } = await pool.query(
+			"SELECT * FROM schedules WHERE is_deleted = false ORDER BY id DESC LIMIT 1",
+		);
+		const activePeriod = getCurrentPeriod(schedRows[0]);
+		if (!activePeriod) {
+			return res.json({ success: true, scheduleClosed: true });
 		}
 
 		const { rows: stRows } = await pool.query(
@@ -227,16 +206,21 @@ export async function loginTeacher(req, res) {
 				.json({ success: false, error: "Email not found" });
 		}
 
-		const scheduleStatus = await checkScheduleIsActive();
-		if (!scheduleStatus.active) {
-			return res.json({ success: true, scheduleClosed: true });
-		}
-
+		// Verify password first
 		const valid = await bcrypt.compare(password, user.password);
 		if (!valid) {
 			return res
 				.status(400)
 				.json({ success: false, error: "Password error" });
+		}
+
+		// Then check if an evaluation period is active
+		const { rows: schedRows } = await pool.query(
+			"SELECT * FROM schedules WHERE is_deleted = false ORDER BY id DESC LIMIT 1",
+		);
+		const activePeriod = getCurrentPeriod(schedRows[0]);
+		if (!activePeriod) {
+			return res.json({ success: true, scheduleClosed: true });
 		}
 
 		const { rows: tRows } = await pool.query(

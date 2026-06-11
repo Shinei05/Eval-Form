@@ -32,3 +32,29 @@ export async function sendEmail(to, html, text) {
 		return false;
 	}
 }
+
+/**
+ * Send a bulk notification email via BCC so recipients cannot see each other's addresses.
+ * @param {string[]} recipients - Array of recipient email addresses
+ * @param {string} subject      - Email subject line
+ * @param {string} html         - HTML body
+ * @param {string} text         - Plain-text fallback
+ * @returns {Promise<boolean>}
+ */
+export async function sendBulkEmail(recipients, subject, html, text) {
+	if (!recipients || recipients.length === 0) return false;
+	try {
+		await transporter.sendMail({
+			from: `"School AutoMailer" <${process.env.SMTP_USER}>`,
+			to: process.env.SMTP_USER, // Visible TO is the sender itself
+			bcc: recipients.join(", "),  // All real recipients go to BCC
+			subject,
+			html,
+			text,
+		});
+		return true;
+	} catch (err) {
+		console.error("[SMTP BULK ERROR]", err.message);
+		return false;
+	}
+}

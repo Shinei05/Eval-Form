@@ -5,6 +5,7 @@ import {
 	getSubjects,
 	getSchedule,
 	setSchedule,
+	resetSchedule,
 	aiSummary,
 	exportCSV,
 	exportTeacherReport,
@@ -20,6 +21,7 @@ router.post("/csv-import", authenticate, upload.single("file"), csvImport);
 router.post("/subjects", authenticate, getSubjects);
 router.post("/schedule", authenticate, getSchedule);
 router.post("/set-schedule", authenticate, setSchedule);
+router.post("/reset-schedule", authenticate, resetSchedule);
 router.post("/ai-summary", authenticate, aiSummary);
 router.post("/export", authenticate, exportCSV);
 router.post("/export-teacher", authenticate, exportTeacherReport);
