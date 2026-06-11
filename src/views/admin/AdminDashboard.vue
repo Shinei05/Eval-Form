@@ -23,7 +23,7 @@ function notify(msg, type = "info") {
 }
 
 // Active tab from query
-const activeTab = computed(() => route.query.tab || "student");
+const activeTab = computed(() => route.query.tab || "evaluate");
 
 // Data
 const teachers = ref([]);

@@ -30,5 +30,15 @@ pool.on("error", (err) => {
 	console.error("Unexpected PG pool error:", err.message);
 });
 
+// Initialize questionnaire_settings table automatically on startup
+pool.query(`
+	CREATE TABLE IF NOT EXISTS questionnaire_settings (
+		key VARCHAR(100) PRIMARY KEY,
+		value TEXT NOT NULL
+	);
+`).catch((err) => {
+	console.error("Failed to initialize questionnaire_settings table:", err.message);
+});
+
 export { pool };
 export default pool;

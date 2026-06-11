@@ -44,6 +44,11 @@ const API = {
 	questionDeleteTeacher: `${API_BASE}/questions/delete-teacher`,
 	questionAddTeacher: `${API_BASE}/questions/add-teacher`,
 
+	// ─── Questionnaire Version Management ──────────────────
+	questionsVersions: `${API_BASE}/questions/versions`,
+	questionsSetActive: `${API_BASE}/questions/set-active`,
+	questionsUpload: `${API_BASE}/questions/upload`,
+
 	// ─── Headers ─────────────────────────────────────────
 	headerAdd: `${API_BASE}/headers/add`,
 	headerAddTeacher: `${API_BASE}/headers/add-teacher`,

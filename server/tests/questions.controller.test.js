@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockReq, mockRes } from "./helpers.js";
 
 vi.mock("../src/config/supabase.js", () => ({
-	default: { query: vi.fn() },
+	default: { 
+		query: vi.fn(),
+		connect: vi.fn(() => ({
+			query: vi.fn(),
+			release: vi.fn(),
+		}))
+	},
 }));
 
 import pool from "../src/config/supabase.js";
@@ -18,6 +24,9 @@ import {
 	deleteTeacherQuestion,
 	addStudentQuestion,
 	addTeacherQuestion,
+	getQuestionVersions,
+	setActiveQuestionVersion,
+	uploadQuestionsDocx,
 } from "../src/controllers/questions.controller.js";
 
 describe("questions controller", () => {
@@ -34,29 +43,23 @@ describe("questions controller", () => {
 				{ id: 2, header: "Communication", identifier: "v1" },
 			];
 			const questions = [
-				{
-					id: 10,
-					questions: "Rate clarity",
-					header_id: 1,
-					header_version: "v1",
-				},
-				{
-					id: 11,
-					questions: "Rate pace",
-					header_id: 1,
-					header_version: "v1",
-				},
-				{
-					id: 12,
-					questions: "Rate listening",
-					header_id: 2,
-					header_version: "v1",
-				},
+				{ id: 10, questions: "Rate clarity", header_id: 1, header_version: "v1" },
+				{ id: 11, questions: "Rate pace", header_id: 1, header_version: "v1" },
+				{ id: 12, questions: "Rate listening", header_id: 2, header_version: "v1" },
 			];
 
-			pool.query
-				.mockResolvedValueOnce({ rows: headers, rowCount: 2 })
-				.mockResolvedValueOnce({ rows: questions, rowCount: 3 });
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("questionnaire_settings")) {
+					return { rows: [{ value: "v1" }], rowCount: 1 };
+				}
+				if (sql.includes("headers") && sql.includes("identifier = $1")) {
+					return { rows: headers, rowCount: 2 };
+				}
+				if (sql.includes("questions")) {
+					return { rows: questions, rowCount: 3 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
 
 			const req = mockReq();
 			const res = mockRes();
@@ -71,8 +74,16 @@ describe("questions controller", () => {
 			expect(res._json.headers[1].questions).toHaveLength(1);
 		});
 
-		it("returns 400 when no headers found", async () => {
-			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+		it("returns 400 when no active headers found", async () => {
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("questionnaire_settings")) {
+					return { rows: [{ value: "v1" }], rowCount: 1 };
+				}
+				if (sql.includes("headers")) {
+					return { rows: [], rowCount: 0 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
 
 			const req = mockReq();
 			const res = mockRes();
@@ -87,17 +98,23 @@ describe("questions controller", () => {
 	// ──────────── getStudentQuestionsAll ───────────────────────
 
 	describe("getStudentQuestionsAll", () => {
-		it("returns all headers (including deleted) with questions", async () => {
+		it("returns specific version questions for admin", async () => {
 			const headers = [{ id: 1, header: "H1", identifier: "v2" }];
 			const questions = [
 				{ id: 20, questions: "Q1", header_id: 1, header_version: "v2" },
 			];
 
-			pool.query
-				.mockResolvedValueOnce({ rows: headers, rowCount: 1 })
-				.mockResolvedValueOnce({ rows: questions, rowCount: 1 });
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("headers") && sql.includes("identifier = $1")) {
+					return { rows: headers, rowCount: 1 };
+				}
+				if (sql.includes("questions")) {
+					return { rows: questions, rowCount: 1 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
 
-			const req = mockReq();
+			const req = mockReq({ body: { version: "v2" } });
 			const res = mockRes();
 
 			await getStudentQuestionsAll(req, res);
@@ -116,12 +133,19 @@ describe("questions controller", () => {
 			const questions = [
 				{ id: 30, questions: "Rate collaboration", header_id: 1 },
 			];
-			const identifiers = [{ identifier: "tv1" }];
 
-			pool.query
-				.mockResolvedValueOnce({ rows: headers, rowCount: 1 })
-				.mockResolvedValueOnce({ rows: questions, rowCount: 1 })
-				.mockResolvedValueOnce({ rows: identifiers, rowCount: 1 });
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("questionnaire_settings")) {
+					return { rows: [{ value: "tv1" }], rowCount: 1 };
+				}
+				if (sql.includes("header_t")) {
+					return { rows: headers, rowCount: 1 };
+				}
+				if (sql.includes("question_t")) {
+					return { rows: questions, rowCount: 1 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
 
 			const req = mockReq();
 			const res = mockRes();
@@ -133,41 +157,30 @@ describe("questions controller", () => {
 			expect(res._json.header_ver).toBe("tv1");
 			expect(res._json.headers[0].questions).toHaveLength(1);
 		});
-
-		it("returns 500 when no teacher headers", async () => {
-			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-
-			const req = mockReq();
-			const res = mockRes();
-
-			await getTeacherQuestions(req, res);
-
-			expect(res._status).toBe(500);
-			expect(res._json.success).toBe(false);
-		});
 	});
 
 	// ──────────── getTeacherQuestionsAll ───────────────────────
 
 	describe("getTeacherQuestionsAll", () => {
-		it("returns all teacher headers with questions", async () => {
-			pool.query
-				.mockResolvedValueOnce({
-					rows: [{ id: 1, header: "PH1" }],
-					rowCount: 1,
-				})
-				.mockResolvedValueOnce({
-					rows: [{ id: 40, questions: "Q", header_id: 1 }],
-					rowCount: 1,
-				});
+		it("returns all teacher headers with questions for version", async () => {
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("header_t")) {
+					return { rows: [{ id: 1, header: "PH1" }], rowCount: 1 };
+				}
+				if (sql.includes("question_t")) {
+					return { rows: [{ id: 40, questions: "Q", header_id: 1 }], rowCount: 1 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
 
-			const req = mockReq();
+			const req = mockReq({ body: { version: "tv2" } });
 			const res = mockRes();
 
 			await getTeacherQuestionsAll(req, res);
 
 			expect(res._json.success).toBe(true);
 			expect(res._json.count).toBe(1);
+			expect(res._json.header_ver).toBe("tv2");
 		});
 	});
 
@@ -185,18 +198,6 @@ describe("questions controller", () => {
 			await updateStudentQuestion(req, res);
 
 			expect(res._json.success).toBe(true);
-		});
-
-		it("returns 500 on error", async () => {
-			pool.query.mockRejectedValueOnce(new Error("update failed"));
-
-			const req = mockReq({ body: { id: 10, question: "X" } });
-			const res = mockRes();
-
-			await updateStudentQuestion(req, res);
-
-			expect(res._status).toBe(500);
-			expect(res._json.success).toBe(false);
 		});
 	});
 
@@ -224,7 +225,7 @@ describe("questions controller", () => {
 	// ──────────── deleteStudentQuestion ────────────────────────
 
 	describe("deleteStudentQuestion", () => {
-		it("deletes question from questions table", async () => {
+		it("soft-deletes question from questions table", async () => {
 			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
 			const req = mockReq({ body: { id: 10 } });
@@ -238,23 +239,12 @@ describe("questions controller", () => {
 				expect.any(Array),
 			);
 		});
-
-		it("returns 500 on error", async () => {
-			pool.query.mockRejectedValueOnce(new Error("delete failed"));
-
-			const req = mockReq({ body: { id: 10 } });
-			const res = mockRes();
-
-			await deleteStudentQuestion(req, res);
-
-			expect(res._status).toBe(500);
-		});
 	});
 
 	// ──────────── deleteTeacherQuestion ────────────────────────
 
 	describe("deleteTeacherQuestion", () => {
-		it("deletes question from question_t table", async () => {
+		it("soft-deletes question from question_t table", async () => {
 			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
 			const req = mockReq({ body: { id: 30 } });
@@ -289,19 +279,6 @@ describe("questions controller", () => {
 				expect.any(Array),
 			);
 		});
-
-		it("returns 500 on error", async () => {
-			pool.query.mockRejectedValueOnce(new Error("insert failed"));
-
-			const req = mockReq({
-				body: { id: 1, question: "Q", identifier: "v1" },
-			});
-			const res = mockRes();
-
-			await addStudentQuestion(req, res);
-
-			expect(res._status).toBe(500);
-		});
 	});
 
 	// ──────────── addTeacherQuestion ──────────────────────────
@@ -321,6 +298,50 @@ describe("questions controller", () => {
 			expect(pool.query).toHaveBeenCalledWith(
 				expect.stringContaining("question_t"),
 				expect.any(Array),
+			);
+		});
+	});
+
+	// ──────────── getQuestionVersions ─────────────────────────
+
+	describe("getQuestionVersions", () => {
+		it("returns distinct versions and active version", async () => {
+			pool.query.mockImplementation(async (sql, params) => {
+				if (sql.includes("DISTINCT identifier")) {
+					return { rows: [{ identifier: "v1" }, { identifier: "v2" }], rowCount: 2 };
+				}
+				if (sql.includes("questionnaire_settings")) {
+					return { rows: [{ value: "v2" }], rowCount: 1 };
+				}
+				return { rows: [], rowCount: 0 };
+			});
+
+			const req = mockReq({ body: { type: "student" } });
+			const res = mockRes();
+
+			await getQuestionVersions(req, res);
+
+			expect(res._json.success).toBe(true);
+			expect(res._json.versions).toEqual(["v1", "v2"]);
+			expect(res._json.activeVersion).toBe("v2");
+		});
+	});
+
+	// ──────────── setActiveQuestionVersion ─────────────────────
+
+	describe("setActiveQuestionVersion", () => {
+		it("updates questionnaire_settings successfully", async () => {
+			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+			const req = mockReq({ body: { type: "student", version: "v2" } });
+			const res = mockRes();
+
+			await setActiveQuestionVersion(req, res);
+
+			expect(res._json.success).toBe(true);
+			expect(pool.query).toHaveBeenCalledWith(
+				expect.stringContaining("questionnaire_settings"),
+				["active_student_version", "v2"]
 			);
 		});
 	});

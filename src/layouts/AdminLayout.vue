@@ -226,7 +226,6 @@ onMounted(() => {
 					<span class="page-title">{{ pageTitle }}</span>
 				</div>
 				<div class="topbar-right">
-					<span class="badge badge-primary">Admin</span>
 					<ProfileDropdown
 						:initials="adminInitials"
 						:display-name="adminFullName"
@@ -285,7 +284,8 @@ onMounted(() => {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6);
+	height: 80px;
+	padding: 0 var(--space-5) 0 var(--space-6);
 	border-bottom: 1px solid var(--color-border);
 }
 
@@ -495,7 +495,8 @@ onMounted(() => {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: var(--space-4) var(--space-6);
+	height: 80px;
+	padding: 0 var(--space-6);
 	background: rgba(255, 255, 255, 0.85);
 	backdrop-filter: blur(16px);
 	-webkit-backdrop-filter: blur(16px);

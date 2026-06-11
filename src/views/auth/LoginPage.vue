@@ -88,7 +88,7 @@ async function handleLogin(role) {
 		const redirectMap = {
 			student: "/student",
 			teacher: "/teacher",
-			admin: "/principal",
+			admin: "/principal?tab=evaluate",
 		};
 		setTimeout(() => {
 			router.replace(redirectMap[role]);
