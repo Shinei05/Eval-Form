@@ -18,7 +18,7 @@ export async function getProfile(req, res) {
 		}
 
 		const { rows: userRows } = await pool.query(
-			"SELECT id, email, is_admin, is_teacher FROM users WHERE id = $1 AND is_deleted = false LIMIT 1",
+			"SELECT id, email, is_admin, is_teacher, is_verified FROM users WHERE id = $1 AND is_deleted = false LIMIT 1",
 			[userId],
 		);
 		const user = userRows[0];
@@ -102,6 +102,7 @@ export async function getProfile(req, res) {
 				subject,
 				quarter,
 				year,
+				isVerified: user.is_verified,
 			},
 		});
 	} catch (err) {
@@ -118,7 +119,7 @@ export async function loginStudent(req, res) {
 		const password = req.body.password || req.body.ps;
 
 		const { rows: userRows } = await pool.query(
-			"SELECT id, email, password FROM users WHERE email = $1 AND is_deleted = false LIMIT 1",
+			"SELECT id, email, password, is_verified FROM users WHERE email = $1 AND is_deleted = false LIMIT 1",
 			[email],
 		);
 		const user = userRows[0];
@@ -179,6 +180,7 @@ export async function loginStudent(req, res) {
 				fullname: `${student.firstname} ${student.lastname}`.trim(),
 				grade: student.grade,
 				section: student.section,
+				isVerified: user.is_verified,
 			},
 		});
 	} catch (err) {
@@ -195,7 +197,7 @@ export async function loginTeacher(req, res) {
 		const password = req.body.password || req.body.ps;
 
 		const { rows: userRows } = await pool.query(
-			"SELECT id, email, password FROM users WHERE email = $1 AND is_teacher = true AND is_deleted = false LIMIT 1",
+			"SELECT id, email, password, is_verified FROM users WHERE email = $1 AND is_teacher = true AND is_deleted = false LIMIT 1",
 			[email],
 		);
 		const user = userRows[0];
@@ -257,6 +259,7 @@ export async function loginTeacher(req, res) {
 				subject: teacher.subject,
 				quarter: teacher.quarter,
 				year: teacher.year,
+				isVerified: user.is_verified,
 			},
 		});
 	} catch (err) {
@@ -273,7 +276,7 @@ export async function loginAdmin(req, res) {
 		const password = req.body.password || req.body.ps;
 
 		const { rows: userRows } = await pool.query(
-			"SELECT id, email, password FROM users WHERE email = $1 AND is_admin = true AND is_deleted = false LIMIT 1",
+			"SELECT id, email, password, is_verified FROM users WHERE email = $1 AND is_admin = true AND is_deleted = false LIMIT 1",
 			[email],
 		);
 		const user = userRows[0];
@@ -322,6 +325,7 @@ export async function loginAdmin(req, res) {
 				firstname: teacher.firstname,
 				lastname: teacher.lastname,
 				fullname: `${teacher.firstname} ${teacher.lastname}`.trim(),
+				isVerified: user.is_verified,
 			},
 		});
 	} catch (err) {
@@ -436,7 +440,7 @@ export async function changePassword(req, res) {
 		const newCode = getRandomString(10);
 
 		const { rowCount } = await pool.query(
-			"UPDATE users SET password = $1, reset = $2 WHERE email = $3",
+			"UPDATE users SET password = $1, reset = $2, is_verified = true WHERE email = $3",
 			[hash, newCode, email],
 		);
 
@@ -485,7 +489,7 @@ export async function updatePassword(req, res) {
 
 		const hash = await bcrypt.hash(newPassword, 10);
 
-		await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hash, user.id]);
+		await pool.query("UPDATE users SET password = $1, is_verified = true WHERE id = $2", [hash, user.id]);
 
 		return res.json({ success: true, message: "Password updated successfully." });
 	} catch (err) {

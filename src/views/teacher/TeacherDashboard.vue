@@ -88,38 +88,6 @@ async function checkVerification() {
 	});
 	if (result.success) {
 		verified.value = result.verified ? "1" : "0";
-		if (verified.value !== "1") {
-			verifyStep.value = "code";
-		}
-	}
-}
-
-async function sendVerifyCode() {
-	const result = await request(API.emailVerifySend, {
-		body: { email: user.value.email },
-	});
-	if (result.success) {
-		verifyStep.value = "input";
-		notify("Verification code sent to your email", "success");
-	} else {
-		notify(result.message || "Failed to send code", "error");
-	}
-}
-
-async function submitVerifyCode() {
-	if (!verifyCode.value.trim()) {
-		notify("Please enter the verification code", "error");
-		return;
-	}
-	const result = await request(API.emailVerifyCode, {
-		body: { email: user.value.email, code: verifyCode.value.trim() },
-	});
-	if (result.success) {
-		verified.value = "1";
-		verifyStep.value = "idle";
-		notify("Account verified successfully!", "success");
-	} else {
-		notify(result.message || "Invalid verification code", "error");
 	}
 }
 
@@ -202,50 +170,25 @@ async function loadProfile() {
 				</span>
 			</p>
 		</div>
-			<!-- Verification Banner -->
-			<div v-if="verified !== '1'" class="verify-banner card">
+			<!-- Change Password Banner -->
+			<div v-if="verified !== '1'" class="verify-banner card" style="border-left: 4px solid #f59e0b; background: #fffbeb; border-color: #fde68a;">
 				<div class="verify-left">
-					<span class="material-icons verify-icon"
-						>verified_user</span
-					>
+					<span class="material-icons verify-icon" style="color: #d97706;">warning</span>
 					<div>
-						<h3>Account Verification</h3>
-						<p v-if="verifyStep === 'code'">
-							Verify your email to access all features
-						</p>
-						<p v-if="verifyStep === 'input'">
-							Enter the code sent to your email
+						<h3 style="color: #78350f; font-weight: 600; margin: 0 0 var(--space-1) 0; font-size: 1rem;">Change Your Password</h3>
+						<p style="color: #b45309; margin: 0; font-size: 0.8125rem;">
+							You are currently logged in with a default password. Please update your password in Settings for better account security.
 						</p>
 					</div>
 				</div>
 				<div class="verify-right">
-					<template v-if="verifyStep === 'code'">
-						<button
-							class="btn btn-primary btn-sm"
-							@click="sendVerifyCode"
-						>
-							Send Code
-						</button>
-					</template>
-					<template v-if="verifyStep === 'input'">
-						<form
-							@submit.prevent="submitVerifyCode"
-							class="verify-form"
-						>
-							<input
-								v-model="verifyCode"
-								type="text"
-								placeholder="Enter code"
-								class="verify-input"
-							/>
-							<button
-								type="submit"
-								class="btn btn-primary btn-sm"
-							>
-								Verify
-							</button>
-						</form>
-					</template>
+					<router-link
+						to="/teacher/settings"
+						class="btn btn-warning btn-sm"
+						style="background-color: #d97706; border-color: #d97706; color: white; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 4px; display: inline-block;"
+					>
+						Go to Settings
+					</router-link>
 				</div>
 			</div>
 

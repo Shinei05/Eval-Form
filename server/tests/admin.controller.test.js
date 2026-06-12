@@ -11,6 +11,7 @@ vi.mock("bcryptjs", () => ({
 
 vi.mock("../src/utils/helpers.js", () => ({
 	getRandomString: vi.fn(() => "RAND123456"),
+	getCurrentPeriod: vi.fn(() => 1),
 }));
 
 vi.mock("../src/utils/email.js", () => ({
@@ -185,10 +186,10 @@ describe("admin controller", () => {
 				rows: [
 					{
 						id: 1,
-						time_start: "08:00",
-						date_start: "2026-01-01",
-						time_end: "17:00",
-						date_end: "2026-01-31",
+						p1_time_start: "08:00",
+						p1_date_start: "2026-01-01",
+						p1_time_end: "17:00",
+						p1_date_end: "2026-01-31",
 					},
 				],
 				rowCount: 1,
@@ -200,7 +201,7 @@ describe("admin controller", () => {
 			await getSchedule(req, res);
 
 			expect(res._json.success).toBe(true);
-			expect(res._json.times.time_start).toBe("08:00");
+			expect(res._json.times.p1_time_start).toBe("08:00");
 		});
 
 		it("returns 500 when no schedule found", async () => {
@@ -219,16 +220,15 @@ describe("admin controller", () => {
 	// ────────────────────── setSchedule ───────────────────────
 
 	describe("setSchedule", () => {
-		it("inserts schedule and returns emails", async () => {
+		it("inserts schedule successfully", async () => {
 			pool.query
-				.mockResolvedValueOnce({ rows: [], rowCount: 1 }) // insert schedule
-				.mockResolvedValueOnce({
-					rows: [{ email: "a@b.com" }, { email: "c@d.com" }],
-					rowCount: 2,
-				}); // select emails
+				.mockResolvedValueOnce({ rows: [], rowCount: 0 }) // SELECT check
+				.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // INSERT schedule
 
 			const req = mockReq({
 				body: {
+					period: 1,
+					school_year: "2025-2026",
 					time_start: "08:00",
 					date_start: "2026-01-01",
 					time_end: "17:00",
@@ -240,14 +240,17 @@ describe("admin controller", () => {
 			await setSchedule(req, res);
 
 			expect(res._json.success).toBe(true);
-			expect(res._json.emails).toHaveLength(2);
 		});
 
 		it("returns 500 when insert fails", async () => {
-			pool.query.mockRejectedValueOnce(new Error("db error"));
+			pool.query
+				.mockResolvedValueOnce({ rows: [], rowCount: 0 }) // SELECT check
+				.mockRejectedValueOnce(new Error("db error")); // INSERT fails
 
 			const req = mockReq({
 				body: {
+					period: 1,
+					school_year: "2025-2026",
 					time_start: "08:00",
 					date_start: "2026-01-01",
 					time_end: "17:00",

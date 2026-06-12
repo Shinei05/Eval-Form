@@ -15,6 +15,10 @@ const passwordForm = reactive({
 	confirmPassword: "",
 });
 
+const showCurrentPassword = ref(false);
+const showNewPassword = ref(false);
+const showConfirmPassword = ref(false);
+
 const evaluatorsList = ref([]);
 const studentEvaluations = ref([]);
 const peerEvaluations = ref([]);
@@ -89,6 +93,9 @@ async function updatePassword() {
 		passwordForm.currentPassword = "";
 		passwordForm.newPassword = "";
 		passwordForm.confirmPassword = "";
+		showCurrentPassword.value = false;
+		showNewPassword.value = false;
+		showConfirmPassword.value = false;
 	} else {
 		toast.message = result.error || "Failed to update password.";
 		toast.type = "error";
@@ -162,15 +169,30 @@ async function updatePassword() {
 				<form @submit.prevent="updatePassword" class="password-form">
 					<div class="form-group">
 						<label for="current-pw">Current Password</label>
-						<input id="current-pw" type="password" v-model="passwordForm.currentPassword" placeholder="Enter current password" required />
+						<div class="password-wrapper">
+							<input id="current-pw" :type="showCurrentPassword ? 'text' : 'password'" v-model="passwordForm.currentPassword" placeholder="Enter current password" required />
+							<span class="material-icons visibility-toggle" @click="showCurrentPassword = !showCurrentPassword">
+								{{ showCurrentPassword ? 'visibility' : 'visibility_off' }}
+							</span>
+						</div>
 					</div>
 					<div class="form-group">
 						<label for="new-pw">New Password</label>
-						<input id="new-pw" type="password" v-model="passwordForm.newPassword" placeholder="Enter new password" required />
+						<div class="password-wrapper">
+							<input id="new-pw" :type="showNewPassword ? 'text' : 'password'" v-model="passwordForm.newPassword" placeholder="Enter new password" required />
+							<span class="material-icons visibility-toggle" @click="showNewPassword = !showNewPassword">
+								{{ showNewPassword ? 'visibility' : 'visibility_off' }}
+							</span>
+						</div>
 					</div>
 					<div class="form-group">
 						<label for="confirm-pw">Confirm Password</label>
-						<input id="confirm-pw" type="password" v-model="passwordForm.confirmPassword" placeholder="Confirm new password" required />
+						<div class="password-wrapper">
+							<input id="confirm-pw" :type="showConfirmPassword ? 'text' : 'password'" v-model="passwordForm.confirmPassword" placeholder="Confirm new password" required />
+							<span class="material-icons visibility-toggle" @click="showConfirmPassword = !showConfirmPassword">
+								{{ showConfirmPassword ? 'visibility' : 'visibility_off' }}
+							</span>
+						</div>
 					</div>
 					<button type="submit" class="btn btn-primary" :disabled="isLoading">Update Password</button>
 				</form>
@@ -300,6 +322,32 @@ async function updatePassword() {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-4, 1rem);
+}
+
+.password-wrapper {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+}
+
+.password-wrapper input {
+	width: 100%;
+	padding-right: 2.5rem !important;
+}
+
+.visibility-toggle {
+	position: absolute;
+	right: 0.875rem;
+	cursor: pointer;
+	color: #64748b;
+	font-size: 1.25rem;
+	user-select: none;
+	transition: color 0.2s;
+}
+
+.visibility-toggle:hover {
+	color: #4f46e5;
 }
 
 .form-group label {

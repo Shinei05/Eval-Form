@@ -1,7 +1,6 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/supabase.js";
 import { getRandomString, getCurrentPeriod } from "../utils/helpers.js";
-import { sendEmail, sendBulkEmail } from "../utils/email.js";
 import { aiSummarize } from "../utils/ai.js";
 
 const ELEMENTARY_GRADES = new Set(["4", "5", "6"]);
@@ -366,50 +365,6 @@ export async function setSchedule(req, res) {
 				 VALUES ($1, $2, $3, $4, $5, false)`,
 				[schoolYear, time_start, date_start, time_end, date_end],
 			);
-		}
-
-		// Build notification email
-		const esc = (value) => String(value || "").replace(/[<>&"']/g, "");
-		const periodLabels = ["1st", "2nd", "3rd", "4th"];
-		const label = periodLabels[periodNumber - 1];
-		const periodLine = {
-			label,
-			startDate: esc(date_start),
-			startTime: esc(time_start),
-			endDate: esc(date_end),
-			endTime: esc(time_end),
-			schoolYear: esc(schoolYear),
-		};
-
-		const html = `
-    <center style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 40px 20px; margin: 0;">
-      <div style="max-width: 600px; background-color: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <h1 style="color: #2c3e50; margin-bottom: 30px; font-size: 28px; border-bottom: 2px solid #3498db; padding-bottom: 15px;">Evaluations has now commence you may now evaluate</h1>
-				<div style="text-align: left; margin: 25px 0;">
-					<h3 style="color: #34495e; margin: 15px 0; font-size: 18px;"><strong style="color: #2c3e50;">School Year:</strong> ${periodLine.schoolYear}</h3>
-					<h3 style="color: #34495e; margin: 15px 0; font-size: 18px;"><strong style="color: #2c3e50;">${periodLine.label} Period:</strong> ${periodLine.startDate} ${periodLine.startTime} - ${periodLine.endDate} ${periodLine.endTime}</h3>
-				</div>
-        <br>
-        <p style="color: #7f8c8d; font-size: 16px; line-height: 1.6; background-color: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #3498db;">
-          Be sure to evaluate with sincerity and honesty and please follow the designated time. <strong style="color: #e74c3c;">Thank You!</strong>
-        </p>
-      </div>
-    </center>`;
-
-		const altBody = `Evaluations has begun. School Year: ${periodLine.schoolYear}. ${periodLine.label} Period: ${periodLine.startDate} ${periodLine.startTime} - ${periodLine.endDate} ${periodLine.endTime}`;
-
-		// Get all active user emails and send via BCC (fire-and-forget)
-		const { rows: users } = await pool.query(
-			"SELECT email FROM users WHERE is_deleted = false",
-		);
-		const allRecipients = (users || []).map((u) => u.email);
-		if (allRecipients.length > 0) {
-			sendBulkEmail(
-				allRecipients,
-				`EduRate — ${label} Period Evaluation Now Open`,
-				html,
-				altBody,
-			).catch((err) => console.error("Bulk email error:", err.message));
 		}
 
 		return res.json({ success: true });

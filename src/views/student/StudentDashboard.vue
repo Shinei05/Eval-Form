@@ -22,6 +22,8 @@ const userProfile = ref({
 	fullname: "",
 });
 
+const verified = ref("1");
+
 // Data
 const teachers = ref([]);
 const subjects = ref([]);
@@ -119,10 +121,20 @@ async function loadProfile() {
 	}
 }
 
+async function checkVerification() {
+	const result = await request(API.verificationCheck, {
+		body: { email: userProfile.value.email },
+	});
+	if (result.success) {
+		verified.value = result.verified ? "1" : "0";
+	}
+}
+
 onMounted(() => {
 	if (!requireAuth()) return;
 	loadProfile().then(() => {
 		fetchSchedule();
+		checkVerification();
 		fetchTeachers();
 	});
 });
@@ -142,6 +154,28 @@ onMounted(() => {
 					{{ currentPeriod ? formatPeriodLabel(currentPeriod) + " Period" : "Evaluations Closed" }}
 				</span>
 			</p>
+		</div>
+
+		<!-- Change Password Banner -->
+		<div v-if="verified !== '1'" class="verify-banner card" style="border-left: 4px solid #f59e0b; background: #fffbeb; border-color: #fde68a;">
+			<div class="verify-left">
+				<span class="material-icons verify-icon" style="color: #d97706;">warning</span>
+				<div>
+					<h3 style="color: #78350f; font-weight: 600; margin: 0 0 var(--space-1) 0; font-size: 1rem;">Change Your Password</h3>
+					<p style="color: #b45309; margin: 0; font-size: 0.8125rem;">
+						You are currently logged in with a default password. Please update your password in Settings for better account security.
+					</p>
+				</div>
+			</div>
+			<div class="verify-right">
+				<router-link
+					to="/student/settings"
+					class="btn btn-warning btn-sm"
+					style="background-color: #d97706; border-color: #d97706; color: white; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 4px; display: inline-block;"
+				>
+					Go to Settings
+				</router-link>
+			</div>
 		</div>
 		<div class="stats-grid">
 			<div class="stat-card card-available">
@@ -493,6 +527,39 @@ onMounted(() => {
 	}
 	.teacher-grid {
 		grid-template-columns: 1fr;
+	}
+}
+
+/* Verification Banner */
+.verify-banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-4) var(--space-5);
+	margin-bottom: var(--space-6);
+	gap: var(--space-4);
+	flex-wrap: wrap;
+	border: 1px solid;
+	border-radius: var(--radius-lg);
+}
+
+.verify-left {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.verify-icon {
+	font-size: 1.75rem;
+}
+
+@media (max-width: 768px) {
+	.verify-banner {
+		flex-direction: column;
+		text-align: center;
+	}
+	.verify-left {
+		flex-direction: column;
 	}
 }
 </style>
