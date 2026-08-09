@@ -1,7 +1,29 @@
 <template>
   <div class="w-full font-sans">
-    <!-- Loading overlay -->
-    <LoadingOverlay v-if="pageLoading" />
+    <!-- Skeleton Loading State (Matches Teacher Dashboard Layout) -->
+    <div v-if="pageLoading" class="animate-pulse space-y-6">
+      <div class="flex items-center gap-3">
+        <div class="h-12 w-12 rounded-2xl bg-slate-200"></div>
+        <div class="space-y-2">
+          <div class="h-7 w-48 rounded-lg bg-slate-200"></div>
+          <div class="h-4 w-32 rounded-lg bg-slate-200"></div>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+      </div>
+      <div class="h-16 rounded-2xl bg-slate-200"></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+      </div>
+    </div>
 
     <template v-else>
       <div class="animate-fade-up">
@@ -202,7 +224,6 @@ import {
 } from '@lucide/vue'
 import StatCard from '../../components/dashboard/StatCard.vue'
 import TeacherCard from '../../components/dashboard/TeacherCard.vue'
-import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import AppToast from "../../components/AppToast.vue";
 import Pagination from "../../components/Pagination.vue";
 import { useApi } from "../../composables/useApi";

@@ -1,10 +1,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive } from '@lucide/vue';
+import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive, ArrowUpDown } from '@lucide/vue';
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
-import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import AppToast from "../../components/AppToast.vue";
 import ManageAccounts from "../../components/ManageAccounts.vue";
 import ArchivedAccounts from "../../components/ArchivedAccounts.vue";
@@ -47,6 +46,54 @@ const adminFullName = computed(() => {
 	const last = (adminProfile.value.lastname || "").trim();
 	const full = `${first} ${last}`.trim();
 	return full || "Admin";
+});
+
+// Search & Filter state for Student Evaluations tab
+const studentSearch = ref("");
+const studentSortBy = ref("name"); // 'name' | 'subject' | 'evals'
+
+const filteredStudentEvals = computed(() => {
+	let list = [...studentEvals.value];
+	const q = studentSearch.value.trim().toLowerCase();
+	if (q) {
+		list = list.filter((e) => {
+			const name = `${e.firstname || ''} ${e.lastname || ''}`.toLowerCase();
+			const subj = (e.subject || '').toLowerCase();
+			return name.includes(q) || subj.includes(q);
+		});
+	}
+	if (studentSortBy.value === "name") {
+		list.sort((a, b) => (a.lastname || "").localeCompare(b.lastname || ""));
+	} else if (studentSortBy.value === "subject") {
+		list.sort((a, b) => (a.subject || "").localeCompare(b.subject || ""));
+	} else if (studentSortBy.value === "evals") {
+		list.sort((a, b) => (b.eval_count || 0) - (a.eval_count || 0));
+	}
+	return list;
+});
+
+// Search & Filter state for Teacher Evaluations tab
+const teacherSearch = ref("");
+const teacherSortBy = ref("name"); // 'name' | 'subject' | 'evals'
+
+const filteredTeacherEvals = computed(() => {
+	let list = [...teacherEvals.value];
+	const q = teacherSearch.value.trim().toLowerCase();
+	if (q) {
+		list = list.filter((e) => {
+			const name = `${e.firstname || ''} ${e.lastname || ''}`.toLowerCase();
+			const subj = (e.subject || '').toLowerCase();
+			return name.includes(q) || subj.includes(q);
+		});
+	}
+	if (teacherSortBy.value === "name") {
+		list.sort((a, b) => (a.lastname || "").localeCompare(b.lastname || ""));
+	} else if (teacherSortBy.value === "subject") {
+		list.sort((a, b) => (a.subject || "").localeCompare(b.subject || ""));
+	} else if (teacherSortBy.value === "evals") {
+		list.sort((a, b) => (b.eval_count || 0) - (a.eval_count || 0));
+	}
+	return list;
 });
 
 const studentCoverageRate = computed(() => {
@@ -325,7 +372,31 @@ onUnmounted(() => {
 
 <template>
   <div class="w-full font-sans">
-    <LoadingOverlay v-if="isLoading" />
+    <!-- Skeleton Loading State (Matches Admin Dashboard Layout) -->
+    <div v-if="isLoading" class="animate-pulse space-y-6">
+      <div class="flex items-center gap-3">
+        <div class="h-12 w-12 rounded-2xl bg-slate-200"></div>
+        <div class="space-y-2">
+          <div class="h-7 w-48 rounded-lg bg-slate-200"></div>
+          <div class="h-4 w-32 rounded-lg bg-slate-200"></div>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+      </div>
+      <div class="h-16 rounded-2xl bg-slate-200"></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+      </div>
+    </div>
     <AppToast v-bind="toast" @update:visible="toast.visible = $event" />
 
     <!-- Detail Modal -->
@@ -599,10 +670,40 @@ onUnmounted(() => {
 
       <!-- Student Evaluations -->
       <div v-if="activeTab === 'student'" class="space-y-6">
-        <h2 class="text-lg font-bold text-slate-900">Student Evaluations</h2>
+        <!-- Management Island Control Bar -->
+        <div class="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+          <div class="relative w-full sm:max-w-sm">
+            <Search class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+            <label htmlFor="student-eval-search" class="sr-only">Search student evaluations</label>
+            <input
+              id="student-eval-search"
+              type="search"
+              v-model="studentSearch"
+              placeholder="Search by teacher or subject..."
+              class="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-3.5 text-sm text-ink transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 max-w-full">
+            <div class="relative flex-1 sm:flex-none">
+              <ArrowUpDown class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="student-eval-sort" class="sr-only">Sort student evaluations</label>
+              <select
+                id="student-eval-sort"
+                v-model="studentSortBy"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="subject">Sort by Subject</option>
+                <option value="evals">Sort by Submissions</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="ev in studentEvals"
+            v-for="ev in filteredStudentEvals"
             :key="ev.teacher_id"
             @click="openDetail(ev, 'student')"
             class="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md"
@@ -631,9 +732,9 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-if="studentEvals.length === 0" class="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-12 text-slate-500">
+          <div v-if="filteredStudentEvals.length === 0" class="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-12 text-slate-500">
             <BookType class="mb-3 h-8 w-8 text-slate-400" />
-            <p class="text-sm font-medium">No student evaluations yet</p>
+            <p class="text-sm font-medium">No student evaluations found</p>
           </div>
         </div>
         <Pagination
@@ -647,10 +748,40 @@ onUnmounted(() => {
 
       <!-- Teacher Evaluations -->
       <div v-if="activeTab === 'teacher'" class="space-y-6">
-        <h2 class="text-lg font-bold text-slate-900">Teacher Evaluations</h2>
+        <!-- Management Island Control Bar -->
+        <div class="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+          <div class="relative w-full sm:max-w-sm">
+            <Search class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+            <label htmlFor="teacher-eval-search" class="sr-only">Search teacher evaluations</label>
+            <input
+              id="teacher-eval-search"
+              type="search"
+              v-model="teacherSearch"
+              placeholder="Search by teacher or subject..."
+              class="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-3.5 text-sm text-ink transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 max-w-full">
+            <div class="relative flex-1 sm:flex-none">
+              <ArrowUpDown class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="teacher-eval-sort" class="sr-only">Sort teacher evaluations</label>
+              <select
+                id="teacher-eval-sort"
+                v-model="teacherSortBy"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="subject">Sort by Subject</option>
+                <option value="evals">Sort by Submissions</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="ev in teacherEvals"
+            v-for="ev in filteredTeacherEvals"
             :key="ev.teacher_id"
             @click="openDetail(ev, 'teacher')"
             class="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-emerald-300 hover:shadow-md"
@@ -679,9 +810,9 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-if="teacherEvals.length === 0" class="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-12 text-slate-500">
+          <div v-if="filteredTeacherEvals.length === 0" class="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-12 text-slate-500">
             <BookType class="mb-3 h-8 w-8 text-slate-400" />
-            <p class="text-sm font-medium">No teacher evaluations yet</p>
+            <p class="text-sm font-medium">No teacher evaluations found</p>
           </div>
         </div>
         <Pagination

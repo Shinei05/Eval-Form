@@ -49,7 +49,7 @@
         <div class="flex justify-end">
           <button
             type="button"
-            @click="$emit('forgot-password')"
+            @click="$emit('forgot-password', role)"
             :class="['rounded-md text-sm font-semibold underline-offset-4 hover:underline', role.theme.link]"
           >
             Forgot password?

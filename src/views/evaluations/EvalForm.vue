@@ -1,9 +1,22 @@
 <template>
   <div class="min-h-screen bg-slate-50 bg-[url('/assets/background.png')] bg-cover bg-fixed bg-center">
     <TopBar :title="isStudent ? 'Student Evaluation Tool' : 'Peer Evaluation Tool'" />
-    <LoadingOverlay v-if="isLoading" />
+    <!-- Skeleton Loading State (Matches Evaluation Form Layout) -->
+    <main v-if="isLoading" class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 animate-pulse space-y-8">
+      <div class="space-y-3">
+        <div class="h-4 w-28 rounded-lg bg-slate-200"></div>
+        <div class="h-8 w-72 rounded-lg bg-slate-200"></div>
+        <div class="h-4 w-96 rounded-lg bg-slate-200"></div>
+      </div>
+      <div class="h-28 rounded-2xl bg-slate-200"></div>
+      <div class="space-y-6">
+        <div class="h-48 rounded-2xl bg-slate-200"></div>
+        <div class="h-48 rounded-2xl bg-slate-200"></div>
+        <div class="h-48 rounded-2xl bg-slate-200"></div>
+      </div>
+    </main>
 
-    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main v-else class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="mb-8">
         <button
@@ -33,11 +46,9 @@
 
       <!-- Info Section -->
       <section class="mb-8 overflow-hidden rounded-2xl border border-line bg-white/90 p-6 shadow-soft backdrop-blur-xl sm:p-8">
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-              {{ isStudent ? 'Student Name' : 'Evaluator' }}
-            </label>
+        <div :class="['grid grid-cols-1 gap-6 sm:grid-cols-2', isStudent ? 'lg:grid-cols-3' : 'lg:grid-cols-4']">
+          <div v-if="!isStudent">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-ink-muted">Evaluator</label>
             <p class="mt-1 font-semibold text-ink">{{ userName }}</p>
           </div>
           <div>
@@ -153,7 +164,7 @@
               </div>
 
               <!-- Rating Picker -->
-              <div class="flex flex-none flex-wrap items-center gap-1.5 sm:gap-2 max-w-full justify-start sm:justify-end">
+              <div class="flex flex-none flex-wrap items-center justify-end gap-1.5 sm:gap-2 max-w-full">
                 <label
                   v-for="r in ratingScale"
                   :key="r.value"
@@ -240,7 +251,7 @@
               : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
           ]"
         >
-          Submit Evaluation
+          Submit
           <Send class="h-4 w-4" />
         </button>
       </div>
@@ -264,17 +275,71 @@
       @cancel="showSubmitModal = false"
       @update:visible="showSubmitModal = $event"
     />
+
+    <!-- Reset Confirmation Modal -->
+    <ConfirmModal
+      :visible="showResetModal"
+      title="Reset Form"
+      message="Are you sure you want to clear all your answers and feedback?"
+      confirmText="Reset Form"
+      cancelText="Cancel"
+      icon="warning"
+      :danger="true"
+      @confirm="executeReset"
+      @cancel="showResetModal = false"
+      @update:visible="showResetModal = $event"
+    />
+
+    <!-- Reset Undo Mini Toast Pill -->
+    <Transition
+      enter-active-class="transition duration-300 cubic-bezier(0.16, 1, 0.3, 1)"
+      enter-from-class="transform translate-y-6 opacity-0 scale-90"
+      enter-to-class="transform translate-y-0 opacity-100 scale-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="transform translate-y-0 opacity-100 scale-100"
+      leave-to-class="transform translate-y-6 opacity-0 scale-90"
+    >
+      <div
+        v-if="showResetToast"
+        class="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-line bg-white/95 py-2 pl-4 pr-2 text-xs sm:text-sm font-semibold text-ink shadow-lift backdrop-blur-xl"
+      >
+        <span class="flex items-center gap-2">
+          <RotateCcw :class="['h-4 w-4 shrink-0', isStudent ? 'text-indigo-600' : 'text-emerald-600']" />
+          <span class="font-bold text-ink">Form Reset.</span>
+        </span>
+        <button
+          type="button"
+          @click="undoReset"
+          :class="[
+            'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold text-white shadow-soft transition-all cursor-pointer active:scale-95',
+            isStudent
+              ? 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800'
+              : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+          ]"
+        >
+          <Undo2 class="h-3.5 w-3.5" />
+          Undo?
+        </button>
+        <button
+          type="button"
+          @click="showResetToast = false"
+          class="flex h-7 w-7 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-slate-100 hover:text-ink"
+          aria-label="Close"
+        >
+          <X class="h-4 w-4" />
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { ArrowLeft, RefreshCw, Send } from "@lucide/vue";
+import { ArrowLeft, RefreshCw, Send, RotateCcw, Undo2, X } from "@lucide/vue";
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import { useToast } from "../../composables/useToast";
-import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import ConfirmModal from "../../components/ConfirmModal.vue";
 import TopBar from "../../components/common/TopBar.vue";
 import API from "../../utils/api";
@@ -294,6 +359,11 @@ const teacher = ref({});
 const answer = ref({});
 const feedback = ref("");
 const showSubmitModal = ref(false);
+const showResetModal = ref(false);
+const showResetToast = ref(false);
+const previousAnswer = ref({});
+const previousFeedback = ref("");
+let resetToastTimer = null;
 
 // Maps each question_id (DB PK) → its 1-based sequential number across all headers.
 // The teacherTagalogTranslations object is keyed 1–34 by order, not by DB id.
@@ -529,8 +599,35 @@ const studentEnglishTranslations = {
 };
 
 function resetForm() {
+  const hasAnswers = Object.keys(answer.value).some((k) => answer.value[k]);
+  if (!hasAnswers && !feedback.value.trim()) {
+    showToast("Form is already empty.", "info");
+    return;
+  }
+  showResetModal.value = true;
+}
+
+function executeReset() {
+  showResetModal.value = false;
+  previousAnswer.value = JSON.parse(JSON.stringify(answer.value));
+  previousFeedback.value = feedback.value;
+
   answer.value = {};
   feedback.value = "";
+
+  showResetToast.value = true;
+  if (resetToastTimer) clearTimeout(resetToastTimer);
+  resetToastTimer = setTimeout(() => {
+    showResetToast.value = false;
+  }, 7000);
+}
+
+function undoReset() {
+  answer.value = JSON.parse(JSON.stringify(previousAnswer.value));
+  feedback.value = previousFeedback.value;
+  showResetToast.value = false;
+  if (resetToastTimer) clearTimeout(resetToastTimer);
+  showToast("Form restored!", "info");
 }
 
 onMounted(() => {

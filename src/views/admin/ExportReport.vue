@@ -8,6 +8,7 @@ import { useApi } from "../../composables/useApi";
 import depedLogo from "../../assets/DepEd-Logo.png";
 import bagongPinasLogo from "../../assets/bagongpinas.png";
 import jlgisLogo from "../../assets/JLGISlogo.png";
+import { ArrowLeft, FileText, School, Users, Layers, Download, Loader2, X } from "@lucide/vue";
 
 const route = useRoute();
 const { isLoading, error, request } = useApi();
@@ -18,6 +19,8 @@ const peerEvals = ref([]);
 const studentCategories = ref([]);
 const peerCategories = ref([]);
 const printArea = ref(null);
+const showExportModal = ref(false);
+const exportLoading = ref(null);
 const stats = ref({
 	studentCount: 0,
 	peerCount: 0,
@@ -37,6 +40,54 @@ function getAdjectivalRating(score) {
 	if (score >= 2.5) return "Satisfactory (Sometimes Evident)";
 	if (score >= 1.5) return "Unsatisfactory";
 	return "Poor (Not Evident)";
+}
+
+// Dynamic score style & rating tier palette
+function getScoreStyle(scoreNum) {
+	const score = Number(scoreNum) || 0;
+	if (score >= 4.5) {
+		return {
+			bar: '#059669',
+			badgeBg: '#ecfdf5',
+			badgeText: '#047857',
+			border: '#a7f3d0',
+			label: 'Outstanding'
+		};
+	}
+	if (score >= 3.5) {
+		return {
+			bar: '#2563eb',
+			badgeBg: '#eff6ff',
+			badgeText: '#1d4ed8',
+			border: '#bfdbfe',
+			label: 'Very Satisfactory'
+		};
+	}
+	if (score >= 2.5) {
+		return {
+			bar: '#4f46e5',
+			badgeBg: '#eef2ff',
+			badgeText: '#3730a3',
+			border: '#c7d2fe',
+			label: 'Satisfactory'
+		};
+	}
+	if (score >= 1.5) {
+		return {
+			bar: '#d97706',
+			badgeBg: '#fffbeb',
+			badgeText: '#b45309',
+			border: '#fde68a',
+			label: 'Unsatisfactory'
+		};
+	}
+	return {
+		bar: '#e11d48',
+		badgeBg: '#fef2f2',
+		badgeText: '#9f1239',
+		border: '#fecdd3',
+		label: 'Poor'
+	};
 }
 
 // Sentiment CSS tag
@@ -70,43 +121,54 @@ async function fetchReportData() {
 	}
 }
 
-async function handleSavePdf() {
-	if (!printArea.value) return;
+function handleSavePdf() {
+	showExportModal.value = true;
+}
 
-	const canvas = await html2canvas(printArea.value, {
-		scale: 2,
-		useCORS: true,
-		backgroundColor: "#ffffff"
-	});
+async function doExport(target) {
+	exportLoading.value = target;
+	showExportModal.value = false;
 
-	const imgData = canvas.toDataURL("image/png");
-	const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-	const pageWidth = pdf.internal.pageSize.getWidth();
+	const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "legal" });
+	const pageWidth  = pdf.internal.pageSize.getWidth();
 	const pageHeight = pdf.internal.pageSize.getHeight();
-	const imgProps = pdf.getImageProperties(imgData);
-	const imgWidth = pageWidth;
-	const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-	let offset = 0;
-	while (offset < imgHeight) {
-		pdf.addImage(imgData, "PNG", 0, -offset, imgWidth, imgHeight);
-		offset += pageHeight;
-		if (offset < imgHeight) {
-			pdf.addPage();
+	const pages = Array.from(printArea.value.querySelectorAll("[data-pdf-page]"));
+	const toExport = target === "both" ? pages
+		: target === "student" ? [pages[0]]
+		: [pages[1]];
+
+	for (let i = 0; i < toExport.length; i++) {
+		const canvas = await html2canvas(toExport[i], {
+			scale: 2,
+			useCORS: true,
+			backgroundColor: "#ffffff",
+			logging: false,
+		});
+
+		const imgData = canvas.toDataURL("image/png");
+		let imgWidth  = pageWidth;
+		let imgHeight = (canvas.height * imgWidth) / canvas.width;
+		if (imgHeight > pageHeight) {
+			const ratio = pageHeight / imgHeight;
+			imgWidth  *= ratio;
+			imgHeight  = pageHeight;
 		}
+		const xOffset = (pageWidth - imgWidth) / 2;
+		if (i > 0) pdf.addPage();
+		pdf.addImage(imgData, "PNG", xOffset, 0, imgWidth, imgHeight, undefined, "FAST");
 	}
 
 	const safeDate = reportDate.value
-		.toLowerCase()
-		.replace(/\s+/g, "-")
-		.replace(/[^a-z0-9-]/g, "");
+		.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 	const safeLastName = (teacher.value.lastname || "report")
-		.toLowerCase()
-		.replace(/\s+/g, "-")
-		.replace(/[^a-z0-9-]/g, "");
-	const fileName = `teacher-report-${safeLastName}-${safeDate}.pdf`;
+		.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+	const suffix = target === "student" ? "student-eval"
+		: target === "peer" ? "peer-eval" : "full-report";
+	const fileName = `teacher-report-${safeLastName}-${safeDate}-${suffix}.pdf`;
 
 	pdf.save(fileName);
+	exportLoading.value = null;
 }
 
 onMounted(async () => {
@@ -139,192 +201,398 @@ onMounted(async () => {
 		</div>
 
 		<!-- Report View -->
-		<div v-else class="report-content-wrapper">
+		<div v-else class="report-content-wrapper" ref="printArea">
 			<!-- Floating Action Toolbar (hidden on print) -->
 			<div class="toolbar no-print">
 				<router-link to="/principal" class="btn-back">
-					<span class="material-icons">arrow_back</span> Back to Dashboard
+					<ArrowLeft class="h-4 w-4" /> Back to Dashboard
 				</router-link>
 				<div class="toolbar-actions">
 					<button class="btn-print" @click="handleSavePdf">
-						<span class="material-icons">picture_as_pdf</span> Save as PDF
+						<FileText class="h-4 w-4" /> Save as PDF
 					</button>
 				</div>
 			</div>
 
-			<!-- printable A4 page -->
-			<div class="a4-page" ref="printArea">
-				<!-- School Letterhead -->
-				<header class="doc-header">
-					<div class="logo-box">
-						<img :src="depedLogo" alt="DepEd Logo" />
+			<!-- ── Two documents side by side ─────────────── -->
+			<div class="pages-row">
+
+				<!-- ── Doc 1: Student Evaluation Document ───── -->
+				<div class="doc-column">
+					<div class="doc-label no-print student-label">
+						<span class="doc-label-dot" style="background:#3b82f6"></span>
+						Student Evaluation Document
 					</div>
-					<div class="header-text">
-						<p class="line-sm">Republic of the Philippines</p>
-						<p class="line-md">Department of Education</p>
-						<p class="line-lg">SCHOOLS DIVISION OF OLONGAPO CITY</p>
-						<p class="line-school">JAMES L. GORDON INTEGRATED SCHOOL</p>
-					</div>
-					<div class="logo-box">
-						<img :src="bagongPinasLogo" alt="Bagong Pilipinas Logo" />
-					</div>
-				</header>
 
-				<!-- Title -->
-				<div class="report-title-section">
-					<h2>TEACHER EVALUATION PERFORMANCE & SUMMARY REPORT</h2>
-					<p class="subtitle">Generated on {{ reportDate }}</p>
-				</div>
+					<div class="a4-page" data-pdf-page>
+						<!-- School Letterhead -->
+						<header class="doc-header">
+							<div class="logo-box">
+								<img :src="depedLogo" alt="DepEd Logo" />
+							</div>
+							<div class="header-text">
+								<p class="line-sm">Republic of the Philippines</p>
+								<p class="line-md">Department of Education</p>
+								<p class="line-lg">SCHOOLS DIVISION OF OLONGAPO CITY</p>
+								<p class="line-school">JAMES L. GORDON INTEGRATED SCHOOL</p>
+							</div>
+							<div class="logo-box">
+								<img :src="bagongPinasLogo" alt="Bagong Pilipinas Logo" />
+							</div>
+						</header>
 
-				<!-- Teacher Profile Info -->
-				<section class="info-section">
-					<h3 class="section-heading">Teacher Profile</h3>
-					<div class="info-grid">
-						<div class="info-row">
-							<span class="info-label">Name:</span>
-							<span class="info-value text-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
-						</div>
-						<div class="info-row">
-							<span class="info-label">Email:</span>
-							<span class="info-value">{{ teacher.email }}</span>
-						</div>
-						<div class="info-row">
-							<span class="info-label">Subject:</span>
-							<span class="info-value text-bold">{{ teacher.subject_name }}</span>
-						</div>
-						<div class="info-row">
-							<span class="info-label">Quarter / Year:</span>
-							<span class="info-value">Quarter {{ teacher.quarter }} | SY {{ teacher.year }}</span>
-						</div>
-					</div>
-				</section>
-
-				<!-- Overall Metrics Summary -->
-				<section class="info-section">
-					<h3 class="section-heading">Overall Performance Summary</h3>
-					
-					<div class="metrics-grid">
-						<!-- Student Evals Card -->
-						<div class="metric-card student-color">
-							<div class="metric-header">
-								<span class="metric-title">Student Evaluations</span>
-								<span class="count-badge">{{ stats.studentCount }} respondents</span>
-							</div>
-							<div class="metric-body">
-								<div class="score-value">{{ stats.studentAvg.toFixed(2) }}</div>
-								<div class="score-scale">/ 5.00</div>
-							</div>
-							<div class="metric-rating">{{ getAdjectivalRating(stats.studentAvg) }}</div>
-							<!-- Progress Bar -->
-							<div class="progress-bar-container">
-								<div class="progress-bar" :style="{ width: (stats.studentAvg / 5 * 100) + '%' }"></div>
-							</div>
+						<!-- Title -->
+						<div class="report-title-section">
+							<h2>TEACHER EVALUATION PERFORMANCE REPORT</h2>
+							<p class="subtitle">Student Evaluation Report &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
 						</div>
 
-						<!-- Peer Evals Card -->
-						<div class="metric-card peer-color">
-							<div class="metric-header">
-								<span class="metric-title">Peer/Teacher Evals</span>
-								<span class="count-badge">{{ stats.peerCount }} respondents</span>
+						<!-- Compact Side-by-Side: Profile + Summary Hero -->
+						<div class="profile-summary-grid">
+							<!-- Teacher Profile -->
+							<div class="profile-card">
+								<h4 class="card-title">Teacher Profile</h4>
+								<div class="meta-list">
+									<div class="meta-item">
+										<span class="meta-label">Name:</span>
+										<span class="meta-val font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Email:</span>
+										<span class="meta-val">{{ teacher.email }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Subject:</span>
+										<span class="meta-val font-bold">{{ teacher.subject_name }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Period:</span>
+										<span class="meta-val">Quarter {{ teacher.quarter }} | SY {{ teacher.year }}</span>
+									</div>
+								</div>
 							</div>
-							<div class="metric-body">
-								<div class="score-value">{{ stats.peerAvg.toFixed(2) }}</div>
-								<div class="score-scale">/ 5.00</div>
-							</div>
-							<div class="metric-rating">{{ getAdjectivalRating(stats.peerAvg) }}</div>
-							<!-- Progress Bar -->
-							<div class="progress-bar-container">
-								<div class="progress-bar" :style="{ width: (stats.peerAvg / 5 * 100) + '%' }"></div>
+
+							<!-- Summary Hero Card -->
+							<div class="summary-hero-card" :style="{ borderColor: getScoreStyle(stats.studentAvg).border }">
+								<div class="hero-header">
+									<span class="hero-title">Overall Student Rating</span>
+									<span class="hero-badge">{{ stats.studentCount }} respondents</span>
+								</div>
+								<div class="hero-body">
+									<span class="hero-score" :style="{ color: getScoreStyle(stats.studentAvg).bar }">{{ stats.studentAvg.toFixed(2) }}</span>
+									<span class="hero-scale">/ 5.00</span>
+								</div>
+								<div class="hero-tag" :style="{ background: getScoreStyle(stats.studentAvg).badgeBg, color: getScoreStyle(stats.studentAvg).badgeText }">
+									{{ getAdjectivalRating(stats.studentAvg) }}
+								</div>
+								<div class="hero-progress-track">
+									<div class="hero-progress-fill" :style="{ width: (stats.studentAvg / 5 * 100) + '%', background: getScoreStyle(stats.studentAvg).bar }"></div>
+								</div>
 							</div>
 						</div>
 
-						<!-- Combined Card -->
-						<div class="metric-card combined-color">
-							<div class="metric-header">
-								<span class="metric-title">Combined Rating</span>
-								<span class="count-badge">{{ stats.totalCount }} total evals</span>
-							</div>
-							<div class="metric-body">
-								<div class="score-value text-primary">{{ stats.combinedAvg.toFixed(2) }}</div>
-								<div class="score-scale">/ 5.00</div>
-							</div>
-							<div class="metric-rating rating-bold">{{ getAdjectivalRating(stats.combinedAvg) }}</div>
-							<!-- Progress Bar -->
-							<div class="progress-bar-container">
-								<div class="progress-bar" :style="{ width: (stats.combinedAvg / 5 * 100) + '%' }"></div>
-							</div>
-						</div>
-					</div>
-				</section>
-
-				<!-- Category performance (Student & Peer) -->
-				<section class="info-section page-break-before">
-					<h3 class="section-heading">Performance Breakdown By Category</h3>
-					
-					<div class="categories-container">
-						<!-- Student Categories -->
-						<div class="category-block">
-							<h4>Student Evaluation Categories</h4>
+						<!-- Student Category Breakdown — color-coded cards -->
+						<section class="info-section">
+							<h3 class="section-heading">Student Evaluation — Category Breakdown</h3>
 							<div v-if="studentCategories.length === 0" class="no-data-msg">No student evaluations recorded.</div>
-							<div v-else class="category-list">
-								<div v-for="cat in studentCategories" :key="cat.header" class="category-row">
-									<div class="category-info">
-										<span class="category-name">{{ cat.header }}</span>
-										<span class="category-score">{{ Number(cat.avg_score).toFixed(2) }} / 5.00</span>
+							<div v-else class="cat-cards-list">
+								<div
+									v-for="(cat, idx) in studentCategories"
+									:key="cat.header"
+									class="cat-card"
+									:style="{ borderLeftColor: getScoreStyle(cat.avg_score).bar }"
+								>
+									<div class="cat-card-top">
+										<div class="cat-left">
+											<span class="cat-idx">{{ String(idx + 1).padStart(2, '0') }}</span>
+											<span class="cat-title">{{ cat.header }}</span>
+										</div>
+										<div
+											class="cat-score-badge"
+											:style="{
+												background: getScoreStyle(cat.avg_score).badgeBg,
+												color: getScoreStyle(cat.avg_score).badgeText,
+												borderColor: getScoreStyle(cat.avg_score).border
+											}"
+										>
+											<strong>{{ Number(cat.avg_score).toFixed(2) }}</strong> / 5.00
+											<span class="cat-rating-tag">{{ getScoreStyle(cat.avg_score).label }}</span>
+										</div>
 									</div>
-									<div class="progress-bar-container">
-										<div class="progress-bar student-bar" :style="{ width: (Number(cat.avg_score) / 5 * 100) + '%' }"></div>
+									<div class="cat-track">
+										<div
+											class="cat-fill"
+											:style="{
+												width: (Number(cat.avg_score) / 5 * 100) + '%',
+												background: getScoreStyle(cat.avg_score).bar
+											}"
+										></div>
 									</div>
+								</div>
+							</div>
+						</section>
+
+						<!-- Signatures Section -->
+						<section class="signature-section">
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Prepared By (Admin)</p>
+							</div>
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Noted / Approved By (Principal)</p>
+							</div>
+						</section>
+
+						<!-- Document Footer -->
+						<footer class="doc-footer">
+							<div class="footer-logo">
+								<img :src="jlgisLogo" alt="JLGIS Logo" />
+							</div>
+							<div class="footer-lines">
+								<p><strong>Address:</strong> Foster St. Brgy. Kababae, Olongapo City 2200</p>
+								<p><strong>Tel. no.:</strong> (047) 222-4769 | <strong>Email:</strong> 500027@deped.gov.ph</p>
+								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
+							</div>
+						</footer>
+					</div> <!-- /a4-page doc 1 -->
+				</div> <!-- /doc-column 1 -->
+
+				<!-- ── Doc 2: Peer / Teacher Evaluation Document ────── -->
+				<div class="doc-column">
+					<div class="doc-label no-print peer-label">
+						<span class="doc-label-dot" style="background:#10b981"></span>
+						Peer / Teacher Evaluation
+					</div>
+
+					<div class="a4-page" data-pdf-page>
+						<!-- School Letterhead -->
+						<header class="doc-header">
+							<div class="logo-box">
+								<img :src="depedLogo" alt="DepEd Logo" />
+							</div>
+							<div class="header-text">
+								<p class="line-sm">Republic of the Philippines</p>
+								<p class="line-md">Department of Education</p>
+								<p class="line-lg">SCHOOLS DIVISION OF OLONGAPO CITY</p>
+								<p class="line-school">JAMES L. GORDON INTEGRATED SCHOOL</p>
+							</div>
+							<div class="logo-box">
+								<img :src="bagongPinasLogo" alt="Bagong Pilipinas Logo" />
+							</div>
+						</header>
+
+						<!-- Title -->
+						<div class="report-title-section">
+							<h2>PEER / TEACHER EVALUATION PERFORMANCE REPORT</h2>
+							<p class="subtitle">Peer / Teacher Evaluation Report &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
+						</div>
+
+						<!-- Compact Side-by-Side: Profile + Summary Hero -->
+						<div class="profile-summary-grid">
+							<!-- Teacher Profile -->
+							<div class="profile-card">
+								<h4 class="card-title">Teacher Profile</h4>
+								<div class="meta-list">
+									<div class="meta-item">
+										<span class="meta-label">Name:</span>
+										<span class="meta-val font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Email:</span>
+										<span class="meta-val">{{ teacher.email }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Subject:</span>
+										<span class="meta-val font-bold">{{ teacher.subject_name }}</span>
+									</div>
+									<div class="meta-item">
+										<span class="meta-label">Period:</span>
+										<span class="meta-val">Quarter {{ teacher.quarter }} | SY {{ teacher.year }}</span>
+									</div>
+								</div>
+							</div>
+
+							<!-- Summary Hero Card -->
+							<div class="summary-hero-card" :style="{ borderColor: getScoreStyle(stats.peerAvg).border }">
+								<div class="hero-header">
+									<span class="hero-title">Overall Peer / Teacher Rating</span>
+									<span class="hero-badge">{{ stats.peerCount }} respondents</span>
+								</div>
+								<div class="hero-body">
+									<span class="hero-score" :style="{ color: getScoreStyle(stats.peerAvg).bar }">{{ stats.peerAvg.toFixed(2) }}</span>
+									<span class="hero-scale">/ 5.00</span>
+								</div>
+								<div class="hero-tag" :style="{ background: getScoreStyle(stats.peerAvg).badgeBg, color: getScoreStyle(stats.peerAvg).badgeText }">
+									{{ getAdjectivalRating(stats.peerAvg) }}
+								</div>
+								<div class="hero-progress-track">
+									<div class="hero-progress-fill" :style="{ width: (stats.peerAvg / 5 * 100) + '%', background: getScoreStyle(stats.peerAvg).bar }"></div>
 								</div>
 							</div>
 						</div>
 
-						<!-- Peer Categories -->
-						<div class="category-block">
-							<h4>Peer/Teacher Evaluation Categories</h4>
+						<!-- Peer Category Breakdown — color-coded cards -->
+						<section class="info-section">
+							<h3 class="section-heading">Peer / Teacher Evaluation — Category Breakdown</h3>
 							<div v-if="peerCategories.length === 0" class="no-data-msg">No peer/teacher evaluations recorded.</div>
-							<div v-else class="category-list">
-								<div v-for="cat in peerCategories" :key="cat.header" class="category-row">
-									<div class="category-info">
-										<span class="category-name">{{ cat.header }}</span>
-										<span class="category-score">{{ Number(cat.avg_score).toFixed(2) }} / 5.00</span>
+							<div v-else class="cat-cards-list">
+								<div
+									v-for="(cat, idx) in peerCategories"
+									:key="cat.header"
+									class="cat-card"
+									:style="{ borderLeftColor: getScoreStyle(cat.avg_score).bar }"
+								>
+									<div class="cat-card-top">
+										<div class="cat-left">
+											<span class="cat-idx">{{ String(idx + 1).padStart(2, '0') }}</span>
+											<span class="cat-title">{{ cat.header }}</span>
+										</div>
+										<div
+											class="cat-score-badge"
+											:style="{
+												background: getScoreStyle(cat.avg_score).badgeBg,
+												color: getScoreStyle(cat.avg_score).badgeText,
+												borderColor: getScoreStyle(cat.avg_score).border
+											}"
+										>
+											<strong>{{ Number(cat.avg_score).toFixed(2) }}</strong> / 5.00
+											<span class="cat-rating-tag">{{ getScoreStyle(cat.avg_score).label }}</span>
+										</div>
 									</div>
-									<div class="progress-bar-container">
-										<div class="progress-bar peer-bar" :style="{ width: (Number(cat.avg_score) / 5 * 100) + '%' }"></div>
+									<div class="cat-track">
+										<div
+											class="cat-fill"
+											:style="{
+												width: (Number(cat.avg_score) / 5 * 100) + '%',
+												background: getScoreStyle(cat.avg_score).bar
+											}"
+										></div>
 									</div>
 								</div>
 							</div>
+						</section>
+
+						<!-- Signatures Section -->
+						<section class="signature-section">
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Prepared By (Admin)</p>
+							</div>
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Noted / Approved By (Principal)</p>
+							</div>
+						</section>
+
+						<!-- Document Footer -->
+						<footer class="doc-footer">
+							<div class="footer-logo">
+								<img :src="jlgisLogo" alt="JLGIS Logo" />
+							</div>
+							<div class="footer-lines">
+								<p><strong>Address:</strong> Foster St. Brgy. Kababae, Olongapo City 2200</p>
+								<p><strong>Tel. no.:</strong> (047) 222-4769 | <strong>Email:</strong> 500027@deped.gov.ph</p>
+								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
+							</div>
+						</footer>
+					</div> <!-- /a4-page doc 2 -->
+				</div> <!-- /doc-column 2 -->
+			</div> <!-- /pages-row -->
+		</div> <!-- /report-content-wrapper -->
+
+		<!-- ── Export Choice Modal ────────────────────────── -->
+		<Teleport to="body">
+			<Transition
+				enter-active-class="transition duration-150 ease-out"
+				enter-from-class="opacity-0"
+				enter-to-class="opacity-100"
+				leave-active-class="transition duration-100 ease-in"
+				leave-from-class="opacity-100"
+				leave-to-class="opacity-0"
+			>
+				<div
+					v-if="showExportModal"
+					class="export-modal-backdrop"
+					@click.self="showExportModal = false"
+				>
+					<Transition
+						enter-active-class="transition duration-200 ease-out"
+						enter-from-class="opacity-0 scale-95 translate-y-2"
+						enter-to-class="opacity-100 scale-100 translate-y-0"
+						leave-active-class="transition duration-150 ease-in"
+						leave-from-class="opacity-100 scale-100 translate-y-0"
+						leave-to-class="opacity-0 scale-95 translate-y-2"
+					>
+						<div v-if="showExportModal" class="export-modal-card">
+							<!-- Close X button -->
+							<button type="button" class="export-modal-close" @click="showExportModal = false" aria-label="Close dialog">
+								<X class="h-4 w-4" />
+							</button>
+
+							<!-- Icon -->
+							<div class="export-modal-icon">
+								<FileText class="h-7 w-7 text-indigo-600" />
+							</div>
+							<h3 class="export-modal-title">Export Evaluation Report</h3>
+							<p class="export-modal-sub">Select which document format you want to download:</p>
+
+							<!-- Options -->
+							<div class="export-options">
+								<!-- Student Only -->
+								<button
+									class="export-option student-opt"
+									:disabled="exportLoading !== null"
+									@click="doExport('student')"
+								>
+									<span class="export-opt-icon-wrap bg-blue-100 text-blue-700">
+										<School class="h-5 w-5" />
+									</span>
+									<div class="export-opt-text">
+										<strong>Student Evaluation</strong>
+										<small>Student-to-teacher ratings &amp; category breakdown</small>
+									</div>
+								</button>
+
+								<!-- Peer Only -->
+								<button
+									class="export-option peer-opt"
+									:disabled="exportLoading !== null"
+									@click="doExport('peer')"
+								>
+									<span class="export-opt-icon-wrap bg-emerald-100 text-emerald-700">
+										<Users class="h-5 w-5" />
+									</span>
+									<div class="export-opt-text">
+										<strong>Peer / Teacher Evaluation</strong>
+										<small>Peer-to-peer ratings &amp; category breakdown</small>
+									</div>
+								</button>
+
+								<!-- Export Both -->
+								<button
+									class="export-option both-opt"
+									:disabled="exportLoading !== null"
+									@click="doExport('both')"
+								>
+									<span class="export-opt-icon-wrap bg-indigo-100 text-indigo-700">
+										<Layers class="h-5 w-5" />
+									</span>
+									<div class="export-opt-text">
+										<strong>Export Both Documents</strong>
+										<small>Complete two-page Legal PDF package</small>
+									</div>
+								</button>
+							</div>
+
+							<!-- Cancel -->
+							<button class="export-cancel" @click="showExportModal = false">Cancel</button>
 						</div>
-					</div>
-				</section>
-
-
-				<!-- Signatures Section -->
-				<section class="signature-section">
-					<div class="sig-col">
-						<div class="sig-line"></div>
-						<p class="sig-label">Prepared By (Admin)</p>
-					</div>
-					<div class="sig-col">
-						<div class="sig-line"></div>
-						<p class="sig-label">Noted / Approved By (Principal)</p>
-					</div>
-				</section>
-
-				<!-- Document Footer -->
-				<footer class="doc-footer">
-					<div class="footer-logo">
-						<img :src="jlgisLogo" alt="JLGIS Logo" />
-					</div>
-					<div class="footer-lines">
-						<p><strong>Address:</strong> Foster St. Brgy. Kababae, Olongapo City 2200</p>
-						<p><strong>Tel. no.:</strong> (047) 222-4769 | <strong>Email:</strong> 500027@deped.gov.ph</p>
-						<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
-					</div>
-				</footer>
-			</div>
-		</div>
-	</div>
+					</Transition>
+				</div>
+			</Transition>
+		</Teleport>
+	</div> <!-- /export-report-container -->
 </template>
 
 <style scoped>
@@ -356,17 +624,17 @@ onMounted(async () => {
 }
 
 @page {
-	size: A4;
+	size: legal;
 	margin: 15mm 10mm;
 }
 
 /* ── Container styles ───────────────────────────────── */
 .export-report-container {
 	min-height: 100vh;
-	background: #f1f5f9;
+	background: #f4f6fa;
 	padding: 2rem 1rem;
-	font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
-	color: #1e293b;
+	font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+	color: #0f172a;
 }
 
 .report-content-wrapper {
@@ -378,7 +646,8 @@ onMounted(async () => {
 
 /* ── Floating Action Toolbar ────────────────────────── */
 .toolbar {
-	width: 210mm;
+	width: fit-content;
+	min-width: 472mm;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -426,10 +695,10 @@ onMounted(async () => {
 	font-size: 1.25rem;
 }
 
-/* ── A4 Page Layout ─────────────────────────────────── */
+/* ── Legal Page Layout ─────────────────────────────────── */
 .a4-page {
-	width: 210mm;
-	min-height: 297mm;
+	width: 215.9mm;
+	min-height: 355.6mm;
 	background: #ffffff;
 	box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 	border: 1px solid #e2e8f0;
@@ -522,126 +791,202 @@ onMounted(async () => {
 	letter-spacing: 0.5px;
 }
 
-/* ── Teacher Profile Grid ───────────────────────────── */
-.info-grid {
+/* ── Side-by-Side Profile + Hero Grid ───────────────── */
+.profile-summary-grid {
+	display: grid;
+	grid-template-columns: 1.1fr 0.9fr;
+	gap: 1.25rem;
+	margin-bottom: 1.5rem;
+}
+
+.profile-card {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+	padding: 1rem 1.25rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+.card-title {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	font-weight: 700;
+	color: #64748b;
+	margin: 0 0 0.6rem 0;
+}
+.meta-list {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 0.75rem 2rem;
-	background: #f8fafc;
-	border-radius: 8px;
-	padding: 1rem;
-	border: 1px solid #f1f5f9;
+	gap: 0.5rem 1rem;
 }
-.info-row {
-	display: flex;
-	font-size: 0.875rem;
-}
-.info-label {
-	color: #64748b;
-	width: 110px;
-	font-weight: 500;
-}
-.info-value {
-	color: #0f172a;
-	flex: 1;
-}
-.text-bold {
-	font-weight: 600;
-}
-
-/* ── Overall Metrics Cards ──────────────────────────── */
-.metrics-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 1rem;
-}
-.metric-card {
-	background: #ffffff;
-	border: 1px solid #e2e8f0;
-	border-radius: 8px;
-	padding: 1rem;
+.meta-item {
 	display: flex;
 	flex-direction: column;
-	position: relative;
-	overflow: hidden;
-}
-.metric-header {
-	display: flex;
-	flex-direction: column;
-	margin-bottom: 0.5rem;
-}
-.metric-title {
 	font-size: 0.8rem;
-	color: #64748b;
-	font-weight: 600;
-	text-transform: uppercase;
 }
-.count-badge {
+.meta-label {
 	font-size: 0.7rem;
 	color: #94a3b8;
+	font-weight: 500;
+	text-transform: uppercase;
 }
-.metric-body {
+.meta-val {
+	color: #0f172a;
+	word-break: break-word;
+}
+
+.summary-hero-card {
+	background: #ffffff;
+	border: 2px solid #bfdbfe;
+	border-radius: 10px;
+	padding: 1rem 1.25rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	box-shadow: 0 4px 6px -2px rgba(15, 23, 42, 0.03);
+}
+.hero-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+.hero-title {
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: #475569;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+}
+.hero-badge {
+	font-size: 0.7rem;
+	color: #94a3b8;
+	font-weight: 500;
+}
+.hero-body {
 	display: flex;
 	align-items: baseline;
-	margin-bottom: 0.25rem;
+	margin: 0.3rem 0;
 }
-.score-value {
-	font-size: 1.85rem;
+.hero-score {
+	font-size: 2.2rem;
 	font-weight: 800;
-	line-height: 1.1;
-	color: #1e293b;
+	line-height: 1;
 }
-.score-scale {
-	font-size: 0.8rem;
+.hero-scale {
+	font-size: 0.85rem;
 	color: #94a3b8;
-	margin-left: 0.25rem;
+	margin-left: 0.3rem;
+	font-weight: 600;
 }
-.metric-rating {
-	font-size: 0.75rem;
-	color: #475569;
+.hero-tag {
+	display: inline-block;
+	align-self: flex-start;
+	font-size: 0.725rem;
+	font-weight: 700;
+	padding: 0.2rem 0.55rem;
+	border-radius: 6px;
 	margin-bottom: 0.5rem;
 }
-.rating-bold {
-	font-weight: 600;
-	color: #1e3a8a;
-}
-
-/* Card custom colors and borders */
-.student-color {
-	border-left: 4px solid #3b82f6;
-}
-.peer-color {
-	border-left: 4px solid #10b981;
-}
-.combined-color {
-	border-left: 4px solid #6366f1;
-	background: #fcfcff;
-}
-
-/* Progress bar in metrics */
-.progress-bar-container {
+.hero-progress-track {
 	height: 6px;
 	background: #e2e8f0;
 	border-radius: 3px;
 	overflow: hidden;
 	width: 100%;
 }
-.progress-bar {
+.hero-progress-fill {
 	height: 100%;
-	background: #6366f1;
 	border-radius: 3px;
-}
-.student-color .progress-bar {
-	background: #3b82f6;
-}
-.peer-color .progress-bar {
-	background: #10b981;
-}
-.combined-color .progress-bar {
-	background: #6366f1;
+	transition: width 0.3s ease;
 }
 
-/* ── Category Breakdowns ────────────────────────────── */
+/* ── Category Breakdown Cards (Dynamic Colors & Space-Efficient) ─ */
+.cat-cards-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+.cat-card {
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-left-width: 4px;
+	border-radius: 8px;
+	padding: 0.65rem 0.85rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+.cat-card-top {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.75rem;
+}
+.cat-left {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	flex: 1;
+	min-width: 0;
+}
+.cat-idx {
+	font-size: 0.7rem;
+	font-weight: 800;
+	color: #64748b;
+	background: #f1f5f9;
+	padding: 0.15rem 0.4rem;
+	border-radius: 4px;
+	letter-spacing: 0.5px;
+	flex-shrink: 0;
+}
+.cat-title {
+	font-size: 0.825rem;
+	font-weight: 600;
+	color: #1e293b;
+	line-height: 1.35;
+	word-break: break-word;
+}
+.cat-score-badge {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.75rem;
+	padding: 0.2rem 0.55rem;
+	border-radius: 6px;
+	border: 1px solid transparent;
+	flex-shrink: 0;
+}
+.cat-rating-tag {
+	font-size: 0.675rem;
+	font-weight: 600;
+	opacity: 0.85;
+	border-left: 1px solid currentColor;
+	padding-left: 0.4rem;
+	margin-left: 0.2rem;
+}
+.cat-track {
+	height: 6px;
+	background: #f1f5f9;
+	border-radius: 3px;
+	overflow: hidden;
+	width: 100%;
+}
+.cat-fill {
+	height: 100%;
+	border-radius: 3px;
+	transition: width 0.3s ease;
+}
+
+
+/* ── Page 2 gap in browser preview ─────────────────── */
+.page-2 {
+	margin-top: 2rem;
+}
+
+/* ── Category Breakdowns (legacy, still used for .no-data-msg) ─ */
 .categories-container {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -858,5 +1203,303 @@ onMounted(async () => {
 	color: #4f46e5;
 	text-decoration: none;
 	font-size: 0.875rem;
+}
+
+/* ── Side-by-side page layout ───────────────────── */
+.pages-row {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 2.5rem;
+	overflow-x: auto;
+	padding-bottom: 2rem;
+}
+.doc-column {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex-shrink: 0;
+}
+.doc-label {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 0.35rem 0.75rem;
+	border-radius: 20px;
+	margin-bottom: 0.75rem;
+}
+.student-label {
+	background: #eff6ff;
+	color: #1d4ed8;
+}
+.peer-label {
+	background: #f0fdf4;
+	color: #15803d;
+}
+.doc-label-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+/* Remove old page-2 margin-top since we're side by side */
+.page-2 {
+	margin-top: 0;
+}
+
+/* ── Export Choice Modal ────────────────────────── */
+.export-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	background: rgba(15, 23, 42, 0.6);
+	backdrop-filter: blur(4px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+}
+.export-modal-card {
+	position: relative;
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-radius: 1.25rem;
+	box-shadow: 0 32px 64px -16px rgba(2, 6, 23, 0.45);
+	padding: 2rem;
+	width: 100%;
+	max-width: 440px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+.export-modal-close {
+	position: absolute;
+	top: 1.25rem;
+	right: 1.25rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.5rem;
+	border: 1px solid #e2e8f0;
+	background: #ffffff;
+	color: #64748b;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+.export-modal-close:hover {
+	background: #f8fafc;
+	color: #0f172a;
+}
+.export-modal-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 3.5rem;
+	height: 3.5rem;
+	border-radius: 1rem;
+	background: #eef2ff;
+	margin-bottom: 1rem;
+}
+.export-modal-title {
+	font-size: 1.25rem;
+	font-weight: 800;
+	color: #0f172a;
+	margin: 0 0 0.35rem 0;
+	letter-spacing: -0.02em;
+}
+.export-modal-sub {
+	font-size: 0.875rem;
+	color: #475569;
+	margin: 0 0 1.5rem 0;
+}
+.export-options {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	width: 100%;
+	margin-bottom: 1.25rem;
+}
+.export-option {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 0.875rem 1.25rem;
+	border-radius: 0.875rem;
+	border: 1.5px solid transparent;
+	cursor: pointer;
+	text-align: left;
+	transition: all 0.15s ease;
+	font-family: inherit;
+}
+.export-option:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.export-opt-icon-wrap {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 0.75rem;
+	flex-shrink: 0;
+}
+.export-opt-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+.export-opt-text strong {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: #0f172a;
+}
+.export-opt-text small {
+	font-size: 0.75rem;
+	color: #64748b;
+}
+.student-opt {
+	background: #f8fafc;
+	border-color: #e2e8f0;
+}
+.student-opt:hover:not(:disabled) {
+	background: #eff6ff;
+	border-color: #bfdbfe;
+}
+.peer-opt {
+	background: #f8fafc;
+	border-color: #e2e8f0;
+}
+.peer-opt:hover:not(:disabled) {
+	background: #f0fdf4;
+	border-color: #bbf7d0;
+}
+.both-opt {
+	background: #f8fafc;
+	border-color: #e2e8f0;
+}
+.both-opt:hover:not(:disabled) {
+	background: #eef2ff;
+	border-color: #c7d2fe;
+}
+.export-cancel {
+	width: 100%;
+	padding: 0.65rem;
+	border-radius: 0.75rem;
+	border: 1px solid #e2e8f0;
+	background: #ffffff;
+	color: #475569;
+	font-size: 0.875rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.15s;
+	font-family: inherit;
+}
+.export-cancel:hover {
+	background: #f8fafc;
+	color: #0f172a;
+}
+
+/* ── Skeleton Loaders ────────────────────────── */
+@keyframes shimmer {
+	0% { opacity: 0.45; }
+	50% { opacity: 0.85; }
+	100% { opacity: 0.45; }
+}
+
+.report-skeleton-wrapper {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: 100%;
+	animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.toolbar-sk {
+	width: fit-content;
+	min-width: 472mm;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background: #ffffff;
+	padding: 1rem 1.5rem;
+	border-radius: 12px;
+	margin-bottom: 1.5rem;
+	border: 1px solid #e2e8f0;
+}
+
+.sk-page {
+	background: #ffffff !important;
+	border: 1px solid #e2e8f0 !important;
+}
+
+.sk-pill {
+	height: 1.5rem;
+	background: #e2e8f0;
+	border-radius: 999px;
+}
+.sk-w-28 { width: 7rem; }
+.sk-w-32 { width: 8rem; }
+.sk-w-36 { width: 9rem; }
+.sk-w-40 { width: 10rem; }
+.sk-w-44 { width: 11rem; }
+.sk-w-50 { width: 12.5rem; }
+.sk-w-60 { width: 15rem; }
+.sk-w-70 { width: 17.5rem; }
+.sk-w-80 { width: 20rem; }
+.sk-w-90 { width: 22.5rem; }
+
+.sk-h-5 { height: 1.25rem; }
+.sk-h-6 { height: 1.5rem; }
+.sk-h-16 { height: 4rem; }
+.sk-h-32 { height: 8rem; }
+
+.sk-header {
+	display: flex;
+	align-items: center;
+	gap: 1.5rem;
+	padding-bottom: 1rem;
+	border-bottom: 2px solid #e2e8f0;
+	margin-bottom: 1.5rem;
+}
+.sk-logo {
+	width: 4.5rem;
+	height: 4.5rem;
+	background: #e2e8f0;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.sk-header-lines {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+}
+.sk-line {
+	height: 0.75rem;
+	background: #e2e8f0;
+	border-radius: 4px;
+}
+.sk-title-block {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 1.5rem;
+}
+.sk-card {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
 }
 </style>
