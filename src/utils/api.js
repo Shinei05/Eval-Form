@@ -84,6 +84,9 @@ const API = {
 	exportTeacherReport: `${API_BASE}/admin/export-teacher`,
 	exportAllTeachersReport: `${API_BASE}/admin/export-all-teachers`,
 	teacherReportData: `${API_BASE}/admin/teacher-report-data`,
+
+	// ─── Announcements ───────────────────────────────────
+	announcements: `${API_BASE}/announcements`,
 };
 
 export default API;

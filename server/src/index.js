@@ -10,6 +10,7 @@ import evaluationsRoutes from "./routes/evaluations.routes.js";
 import teachersRoutes from "./routes/teachers.routes.js";
 import studentsRoutes from "./routes/students.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import announcementsRoutes from "./routes/announcements.routes.js";
 import healthRoutes from "./routes/health.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -55,6 +56,7 @@ app.use("/api/evaluations", evaluationsRoutes);
 app.use("/api/teachers", teachersRoutes);
 app.use("/api/students", studentsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/announcements", announcementsRoutes);
 
 // ─── Error handler (must be last) ───────────────────────────
 app.use(errorHandler);

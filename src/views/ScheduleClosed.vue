@@ -1,5 +1,7 @@
 <script setup>
 import { useRouter } from "vue-router";
+import { CalendarOff, ArrowLeft } from "@lucide/vue";
+
 const router = useRouter();
 
 function goBack() {
@@ -8,76 +10,30 @@ function goBack() {
 </script>
 
 <template>
-    <div class="closed-page">
-        <div class="closed-card">
-            <span class="material-icons-outlined closed-icon">event_busy</span>
-            <h2>Evaluations are currently closed</h2>
-            <p>The administration has not opened the evaluation period yet, or the scheduled time has already ended.</p>
-            <button class="btn-back" @click="goBack">Return to Login</button>
+    <div class="min-h-screen flex items-center justify-center bg-slate-50 p-4 sm:p-6 lg:p-8 bg-[url('/assets/background.png')] bg-cover bg-center">
+        <div class="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white/90 backdrop-blur-xl shadow-2xl">
+			<div class="h-2 w-full bg-rose-500"></div>
+            <div class="px-6 py-10 sm:px-10 text-center">
+                <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-rose-100/50 shadow-inner">
+                    <CalendarOff class="h-10 w-10 text-rose-600" />
+                </div>
+                
+                <h2 class="mb-3 text-2xl font-extrabold tracking-tight text-slate-900">
+                    Evaluations are Closed
+                </h2>
+                
+                <p class="mb-8 text-sm leading-relaxed text-slate-500">
+                    The administration has not opened the evaluation period yet, or the scheduled time has already ended.
+                </p>
+                
+                <button 
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md" 
+                    @click="goBack"
+                >
+                    <ArrowLeft class="h-4 w-4" />
+                    Return to Login
+                </button>
+            </div>
         </div>
     </div>
 </template>
-
-<style scoped>
-.closed-page {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f8fafc;
-    padding: var(--space-4);
-}
-
-.closed-card {
-    background: #fff;
-    max-width: 480px;
-    width: 100%;
-    padding: var(--space-8);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    border-top: 5px solid #dc2626;
-}
-
-.closed-icon {
-    font-size: 4rem;
-    color: #ef4444;
-    margin-bottom: var(--space-4);
-    background: #fef2f2;
-    padding: var(--space-4);
-    border-radius: 50%;
-}
-
-.closed-card h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: var(--space-3);
-}
-
-.closed-card p {
-    color: #64748b;
-    font-size: 1rem;
-    line-height: 1.5;
-    margin-bottom: var(--space-6);
-}
-
-.btn-back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.75rem 1.5rem;
-    background: #4f46e5;
-    color: #fff;
-    font-weight: 600;
-    font-size: 0.875rem;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.btn-back:hover {
-    background: #4338ca;
-}
-</style>

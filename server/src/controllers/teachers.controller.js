@@ -22,7 +22,7 @@ export async function listTeachers(req, res) {
 				    u.email, s.subjects AS subject_name, st.section
 			     FROM student_teacher st
 			     JOIN teachers t ON t.id = st.teacher_id
-			     JOIN users u ON u.id = t.usr_id AND u.is_deleted = false
+			     JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL)
 			     LEFT JOIN subjects s ON s.id = t.subject
 			     WHERE st.student_id = $1`,
 				[studentId],
@@ -71,10 +71,10 @@ export async function listTeachers(req, res) {
 			return `$${baseParams.length}`;
 		};
 
-		const studentParam = addBaseParam(studentId);
-		const evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation WHERE evt_id = ${studentParam}) ev ON ev.tcr_id = t.id`;
+		const studentParam = addBaseParam(studentId ? Number(studentId) : null);
+		const evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation WHERE evt_id = ${studentParam}::int) ev ON ev.tcr_id = t.id`;
 
-		let fromSql = `FROM student_teacher st JOIN teachers t ON t.id = st.teacher_id JOIN users u ON u.id = t.usr_id AND u.is_deleted = false LEFT JOIN subjects s ON s.id = t.subject ${evalJoin}`;
+		let fromSql = `FROM student_teacher st JOIN teachers t ON t.id = st.teacher_id JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL) LEFT JOIN subjects s ON s.id = t.subject ${evalJoin}`;
 		const where = [];
 		const baseWhere = [];
 
@@ -161,30 +161,39 @@ export async function listTeachers(req, res) {
 //  List teachers for faculty/peer view
 export async function listTeachersFaculty(req, res) {
 	try {
-		const evaluatorId = req.body.id;
+		const evaluatorUserId = req.body.id;
+		let evaluatorTeacherId = null;
+		
+		if (evaluatorUserId) {
+			const { rows } = await pool.query("SELECT id FROM teachers WHERE usr_id = $1 LIMIT 1", [evaluatorUserId]);
+			if (rows.length > 0) {
+				evaluatorTeacherId = rows[0].id;
+			}
+		}
+
 		const usePaging = Object.prototype.hasOwnProperty.call(req.body, "page");
 
 		if (!usePaging) {
 			// Original non-paged behavior
 			const { rows: teachers } = await pool.query(
-				`SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id,
+				`SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email,
 			    s.subjects AS subject_name
 			 FROM teachers t
-			 JOIN users u ON u.id = t.usr_id AND u.is_deleted = false
+			 JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL)
 			 LEFT JOIN subjects s ON s.id = t.subject`,
 			);
 
 			// Exclude the logged-in teacher from the list
-			const filtered = evaluatorId
-				? teachers.filter((t) => t.usr_id !== evaluatorId)
+			const filtered = evaluatorUserId
+				? teachers.filter((t) => t.usr_id !== evaluatorUserId)
 				: teachers;
 
 			// Check peer evaluation status
 			let evalSet = new Set();
-			if (evaluatorId) {
+			if (evaluatorTeacherId) {
 				const { rows: evals } = await pool.query(
 					"SELECT tcr_id FROM evaluation_p WHERE evt_id = $1",
-					[evaluatorId],
+					[evaluatorTeacherId],
 				);
 				evalSet = new Set(evals.map((e) => e.tcr_id));
 			}
@@ -193,6 +202,7 @@ export async function listTeachersFaculty(req, res) {
 				id: t.id,
 				firstname: t.firstname,
 				lastname: t.lastname,
+				email: t.email || null,
 				subject: t.subject_name || null,
 				subject_id: t.subject || null,
 				quarter: t.quarter,
@@ -232,14 +242,21 @@ export async function listTeachersFaculty(req, res) {
 			baseParams.push(value);
 			return `$${baseParams.length}`;
 		};
-		const evaluatorParam = addBaseParam(evaluatorId || null);
-		const evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation_p WHERE evt_id = ${evaluatorParam}) ev ON ev.tcr_id = t.id`;
 
-		const fromSql = `FROM teachers t JOIN users u ON u.id = t.usr_id AND u.is_deleted = false LEFT JOIN subjects s ON s.id = t.subject ${evalJoin}`;
+		let evalJoin = "";
+		if (evaluatorTeacherId) {
+			const evalParam = addBaseParam(Number(evaluatorTeacherId));
+			evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation_p WHERE evt_id = ${evalParam}) ev ON ev.tcr_id = t.id`;
+		} else {
+			evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation_p WHERE 1=0) ev ON ev.tcr_id = t.id`;
+		}
+
+		const fromSql = `FROM teachers t JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL) LEFT JOIN subjects s ON s.id = t.subject ${evalJoin}`;
 		const where = [];
 
-		if (evaluatorId) {
-			where.push(`t.usr_id != ${evaluatorParam}`);
+		if (evaluatorUserId) {
+			const userParam = addBaseParam(Number(evaluatorUserId));
+			where.push(`t.usr_id != ${userParam}`);
 		}
 
 		if (search) {
@@ -289,6 +306,7 @@ export async function listTeachersFaculty(req, res) {
 			id: t.id,
 			firstname: t.firstname,
 			lastname: t.lastname,
+			email: t.email || null,
 			subject: t.subject_name || null,
 			subject_id: t.subject || null,
 			quarter: t.quarter,
