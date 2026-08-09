@@ -141,7 +141,7 @@ onMounted(() => {
 		<!-- Sidebar -->
 		<aside
 			:class="[
-				'fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white/90 backdrop-blur-xl border-r border-slate-200 transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+				'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col bg-white/90 backdrop-blur-xl border-r border-slate-200 transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
 				sidebarOpen ? 'translate-x-0' : '-translate-x-full'
 			]"
 		>
@@ -215,7 +215,7 @@ onMounted(() => {
 			</TopBar>
 
 			<!-- Page content -->
-			<main class="flex-1 overflow-y-auto bg-slate-50 bg-[url('/assets/background.png')] bg-cover bg-fixed bg-center p-4 sm:p-6 lg:p-8">
+			<main class="flex-1 overflow-y-auto bg-slate-50 bg-[url('/assets/background.png')] bg-cover bg-fixed bg-center p-3 sm:p-6 lg:p-8">
 				<div class="mx-auto max-w-6xl">
 					<router-view />
 				</div>

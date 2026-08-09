@@ -15,25 +15,23 @@
     <!-- Hero Container -->
     <div class="relative z-10 w-full max-w-xl animate-fade-up">
       <!-- School & Department Seals Header -->
-      <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+      <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
         <div
           v-for="seal in branding.seals"
           :key="seal.alt"
-          class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-md ring-2 ring-white/40 transition-transform duration-200 hover:scale-105 sm:h-20 sm:w-20"
-          style="width: 68px; height: 68px; min-width: 68px; min-height: 68px; border-radius: 9999px; background-color: #ffffff;"
+          class="flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center overflow-hidden rounded-full bg-white p-1.5 shadow-md ring-2 ring-white/40 transition-transform duration-200 hover:scale-105"
         >
           <img
             :src="seal.src"
             :alt="seal.alt"
             class="h-full w-full object-contain"
-            style="width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain;"
           />
         </div>
       </div>
 
       <!-- System Title & Tagline -->
-      <div class="mt-6 text-center">
-        <h1 class="text-3xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-4xl">
+      <div class="mt-5 text-center">
+        <h1 class="text-2xl font-extrabold tracking-tight text-white drop-shadow-md sm:text-4xl">
           {{ branding.name }}
         </h1>
         <p class="mt-2 text-sm text-slate-200 drop-shadow sm:text-base">{{ branding.tagline }}</p>

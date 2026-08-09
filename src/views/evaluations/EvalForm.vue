@@ -153,12 +153,12 @@
               </div>
 
               <!-- Rating Picker -->
-              <div class="flex flex-none flex-wrap items-center gap-2">
+              <div class="flex flex-none flex-wrap items-center gap-1.5 sm:gap-2 max-w-full justify-start sm:justify-end">
                 <label
                   v-for="r in ratingScale"
                   :key="r.value"
                   :class="[
-                    'group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 font-bold transition-all',
+                    'group relative flex h-9 w-9 sm:h-10 sm:w-10 text-xs sm:text-sm cursor-pointer items-center justify-center rounded-full border-2 font-bold transition-all',
                     answer[question.question_id] == r.value
                       ? (isStudent
                           ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-110'

@@ -103,13 +103,13 @@
             />
           </div>
 
-          <div class="flex flex-wrap items-center gap-2.5">
+          <div class="flex flex-wrap items-center gap-2 max-w-full">
             <button
               type="button"
               @click="hideEvaluated = !hideEvaluated"
               :aria-pressed="hideEvaluated"
               :class="[
-                'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition-colors',
+                'inline-flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl border px-3 py-2.5 text-xs sm:text-sm font-semibold transition-colors',
                 hideEvaluated
                   ? 'border-indigo-200 bg-indigo-50 text-indigo-800'
                   : 'border-line bg-white text-ink-soft hover:bg-slate-50'
@@ -119,7 +119,7 @@
               Hide Evaluated
             </button>
 
-            <div class="relative">
+            <div class="relative flex-1 sm:flex-none">
               <ArrowUpDown
                 class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
                 aria-hidden="true"
@@ -130,7 +130,7 @@
               <select
                 id="teacher-sort"
                 v-model="sortBy"
-                class="appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-9 text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
               >
                 <option value="name">Sort by Name</option>
                 <option value="subject">Sort by Subject</option>

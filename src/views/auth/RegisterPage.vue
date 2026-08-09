@@ -171,6 +171,12 @@ async function handleRegister() {
 	padding: var(--space-8);
 }
 
+@media (max-width: 480px) {
+	.register-card {
+		padding: 1.25rem 1rem;
+	}
+}
+
 .register-header {
 	margin-bottom: var(--space-6);
 }

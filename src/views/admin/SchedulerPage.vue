@@ -630,7 +630,7 @@ onMounted(() => {
 						>
 							<ChevronLeft class="h-4 w-4" />
 						</button>
-						<h3 class="min-w-[160px] text-center text-base font-bold text-slate-900">{{ currentMonthName }}</h3>
+						<h3 class="min-w-[120px] sm:min-w-[160px] text-center text-sm sm:text-base font-bold text-slate-900">{{ currentMonthName }}</h3>
 						<button
 							@click="nextMonth"
 							class="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"

@@ -318,27 +318,29 @@ const teacherTagalogTranslations = {
 						h.header_p
 					}}</span>
 				</div>
-				<table class="questions-table">
-					<thead>
-						<tr>
-							<th class="col-question">Questions</th>
-							<th class="col-rating">Rating</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr v-for="q in h.questions" :key="q.question_id">
-							<td>
-								<div class="q-main">{{ q.question }}</div>
-								<div v-if="type === 'teacher' && teacherTagalogTranslations[questionSequenceMap[q.question_id]]" class="q-tagalog">
-									{{ teacherTagalogTranslations[questionSequenceMap[q.question_id]] }}
-								</div>
-							</td>
-							<td class="center">
-								{{ answers[Number(q.question_id)] ?? "N/A" }}
-							</td>
-						</tr>
-					</tbody>
-				</table>
+				<div class="overflow-x-auto w-full max-w-full">
+					<table class="questions-table">
+						<thead>
+							<tr>
+								<th class="col-question">Questions</th>
+								<th class="col-rating">Rating</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="q in h.questions" :key="q.question_id">
+								<td>
+									<div class="q-main">{{ q.question }}</div>
+									<div v-if="type === 'teacher' && teacherTagalogTranslations[questionSequenceMap[q.question_id]]" class="q-tagalog">
+										{{ teacherTagalogTranslations[questionSequenceMap[q.question_id]] }}
+									</div>
+								</td>
+								<td class="center">
+									{{ answers[Number(q.question_id)] ?? "N/A" }}
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
 			</section>
 
 			<!-- Feedback (individual only) -->

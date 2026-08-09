@@ -471,8 +471,8 @@ onMounted(async () => {
 				</div>
 
 				<!-- Add Question Bar -->
-				<div v-if="header.addQ" class="border-b border-indigo-100 bg-indigo-50/30 p-4">
-					<div class="flex items-center gap-3 max-w-3xl">
+				<div v-if="header.addQ" class="border-b border-indigo-100 bg-indigo-50/30 p-3 sm:p-4">
+					<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 max-w-3xl">
 						<input
 							v-model="newQuestion"
 							type="text"

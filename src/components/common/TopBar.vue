@@ -1,37 +1,53 @@
 <template>
   <header class="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur-md">
-    <div class="mx-auto flex h-16 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center gap-3">
+    <div class="mx-auto flex h-16 w-full items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 lg:px-8">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
         <slot name="left"></slot>
-        <h1 class="text-lg font-bold tracking-tight text-ink">{{ title }}</h1>
+        <h1 class="hidden sm:block truncate text-base sm:text-lg font-bold tracking-tight text-ink">{{ title }}</h1>
       </div>
 
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4 flex-none">
         <!-- Notification Bell -->
         <router-link
           v-if="roleId !== 'admin'"
           :to="`/${roleId}/announcements`"
-          class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
+          class="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
         >
-          <Bell class="h-5 w-5" />
-          <span v-if="unreadCount > 0" class="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
+          <Bell class="h-4 w-4 sm:h-5 sm:w-5" />
+          <span v-if="unreadCount > 0" class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
         </router-link>
 
         <div class="relative" ref="containerRef">
+        <!-- Mobile Circular Profile Button -->
         <button
           type="button"
           @click="open = !open"
           aria-haspopup="menu"
           :aria-expanded="open"
-          class="flex items-center gap-2 rounded-full border border-line bg-white py-1 pl-3 pr-2 shadow-soft transition-colors hover:bg-slate-50"
+          class="relative flex sm:hidden h-10 w-10 items-center justify-center rounded-full border border-line bg-white shadow-soft transition-colors hover:bg-slate-50"
+          :title="userName"
         >
-          <span :class="['h-2 w-2 rounded-full', theme.accent]" aria-hidden="true" />
+          <span :class="['absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white', theme.accent]" aria-hidden="true" />
+          <span class="text-xs font-extrabold text-ink">
+            {{ userInitials }}
+          </span>
+        </button>
+
+        <!-- Desktop Full Pill Button -->
+        <button
+          type="button"
+          @click="open = !open"
+          aria-haspopup="menu"
+          :aria-expanded="open"
+          class="hidden sm:flex items-center gap-2 rounded-full border border-line bg-white py-1 pl-3 pr-2 shadow-soft transition-colors hover:bg-slate-50"
+        >
+          <span :class="['h-2 w-2 flex-none rounded-full', theme.accent]" aria-hidden="true" />
           <span class="text-sm font-semibold text-ink-soft">{{ userRoleLabel }}</span>
-          <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-ink">
+          <span class="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-ink">
             {{ userInitials }}
           </span>
           <ChevronDown
-            :class="['h-4 w-4 text-ink-muted transition-transform duration-200', open ? 'rotate-180' : '']"
+            :class="['h-4 w-4 flex-none text-ink-muted transition-transform duration-200', open ? 'rotate-180' : '']"
             aria-hidden="true"
           />
         </button>

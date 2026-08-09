@@ -49,6 +49,18 @@ const adminFullName = computed(() => {
 	return full || "Admin";
 });
 
+const studentCoverageRate = computed(() => {
+	if (!teacherCount.value) return "0%";
+	const pct = Math.round((studentEvals.value.length / teacherCount.value) * 100);
+	return `${pct}%`;
+});
+
+const teacherComplianceRate = computed(() => {
+	if (!teacherCount.value) return "0%";
+	const pct = Math.round((teacherEvals.value.length / teacherCount.value) * 100);
+	return `${pct}%`;
+});
+
 async function loadProfile() {
 	const result = await request(API.profile, { method: "GET" });
 	if (result.success) {
@@ -486,7 +498,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Stats Grid for Evaluate Tab -->
-      <section v-if="activeTab === 'evaluate'" class="grid gap-4 sm:grid-cols-3">
+      <section v-if="activeTab === 'evaluate'" class="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <StatCard
           :icon="User"
           :value="teacherCount"
@@ -514,58 +526,74 @@ onUnmounted(() => {
       </section>
 
       <!-- Stats Grid for Student Evaluations Tab -->
-      <section v-if="activeTab === 'student'" class="grid gap-4 sm:grid-cols-3">
+      <section v-if="activeTab === 'student'" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          :icon="User"
-          :value="teacherCount"
-          label="Teachers"
-          helper="Faculty members in the system"
+          :icon="FileText"
+          :value="studentTotal"
+          label="Total Submissions"
+          helper="Student feedback responses"
           icon-bg="bg-indigo-50/50 border border-indigo-100"
           icon-fg="text-indigo-600"
         />
         <StatCard
-          :icon="UsersRound"
-          :value="studentSystemCount"
-          label="Students"
-          helper="Students in the system"
-          icon-bg="bg-amber-50/50 border border-amber-100"
-          icon-fg="text-amber-600"
-        />
-        <StatCard
-          :icon="FileText"
-          :value="studentTotal"
-          label="Evaluations"
-          helper="Total evaluations submitted"
+          :icon="User"
+          :value="studentEvals.length"
+          label="Faculty Evaluated"
+          helper="Teachers with student feedback"
           icon-bg="bg-emerald-50/50 border border-emerald-100"
           icon-fg="text-emerald-600"
+        />
+        <StatCard
+          :icon="CheckCircle2"
+          :value="studentCoverageRate"
+          label="Faculty Coverage"
+          helper="Teachers receiving evaluations"
+          icon-bg="bg-blue-50/50 border border-blue-100"
+          icon-fg="text-blue-600"
+        />
+        <StatCard
+          :icon="UsersRound"
+          :value="studentSystemCount"
+          label="Total Students"
+          helper="Enrolled students in system"
+          icon-bg="bg-amber-50/50 border border-amber-100"
+          icon-fg="text-amber-600"
         />
       </section>
 
       <!-- Stats Grid for Teacher Evaluations Tab -->
-      <section v-if="activeTab === 'teacher'" class="grid gap-4 sm:grid-cols-3">
+      <section v-if="activeTab === 'teacher'" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          :icon="User"
-          :value="teacherCount"
-          label="Teachers"
-          helper="Faculty members in the system"
+          :icon="FileText"
+          :value="teacherTotal"
+          label="Peer Submissions"
+          helper="Total peer reviews submitted"
           icon-bg="bg-indigo-50/50 border border-indigo-100"
           icon-fg="text-indigo-600"
         />
         <StatCard
-          :icon="UsersRound"
-          :value="studentSystemCount"
-          label="Students"
-          helper="Students in the system"
-          icon-bg="bg-amber-50/50 border border-amber-100"
-          icon-fg="text-amber-600"
-        />
-        <StatCard
-          :icon="FileText"
-          :value="teacherTotal"
-          label="Evaluations"
-          helper="Total evaluations submitted"
+          :icon="User"
+          :value="teacherEvals.length"
+          label="Faculty Reviewed"
+          helper="Teachers with peer reviews"
           icon-bg="bg-emerald-50/50 border border-emerald-100"
           icon-fg="text-emerald-600"
+        />
+        <StatCard
+          :icon="CheckCircle2"
+          :value="teacherComplianceRate"
+          label="Peer Compliance"
+          helper="Faculty review completion rate"
+          icon-bg="bg-blue-50/50 border border-blue-100"
+          icon-fg="text-blue-600"
+        />
+        <StatCard
+          :icon="UsersRound"
+          :value="teacherCount"
+          label="Faculty Members"
+          helper="Total faculty in system"
+          icon-bg="bg-amber-50/50 border border-amber-100"
+          icon-fg="text-amber-600"
         />
       </section>
 

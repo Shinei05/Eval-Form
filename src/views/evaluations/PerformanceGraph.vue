@@ -278,8 +278,14 @@ onMounted(async () => {
 	background: #fff;
 	border: 1px solid var(--color-border, #e5e7eb);
 	border-radius: 12px;
-	padding: 1.5rem;
+	padding: 1rem;
 	box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+}
+
+@media (min-width: 640px) {
+	.card {
+		padding: 1.5rem;
+	}
 }
 
 .card-title {
@@ -294,18 +300,18 @@ onMounted(async () => {
 /* Summary chips */
 .summary-row {
 	display: flex;
-	gap: 0.75rem;
+	gap: 0.5rem;
 	margin-bottom: 1.25rem;
 	flex-wrap: wrap;
 }
 
 .summary-chip {
-	flex: 1;
-	min-width: 100px;
+	flex: 1 1 calc(50% - 0.5rem);
+	min-width: 110px;
 	background: var(--color-bg-page, #f8fafc);
 	border: 1px solid var(--color-border, #e5e7eb);
 	border-radius: 10px;
-	padding: 0.6rem 1rem;
+	padding: 0.6rem 0.5rem;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -329,10 +335,12 @@ onMounted(async () => {
 
 /* Chart */
 .chart-wrap {
-	min-height: 300px;
+	min-height: 260px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	overflow-x: auto;
+	max-width: 100%;
 }
 
 /* Custom legend */

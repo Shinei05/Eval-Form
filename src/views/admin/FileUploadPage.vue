@@ -174,9 +174,9 @@ onMounted(() => {
 					</div>
 				</div>
 
-				<div class="mb-6 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-inner">
+				<div class="mb-6 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-inner max-w-full">
 					<div class="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Example Row</div>
-					<code class="text-xs text-emerald-400 whitespace-nowrap font-mono">student1@school.edu,Juan,Dela Cruz,20001,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026</code>
+					<code class="text-xs text-emerald-400 whitespace-nowrap font-mono block overflow-x-auto pb-1">student1@school.edu,Juan,Dela Cruz,20001,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026</code>
 				</div>
 
 				<ul class="space-y-2 mb-6">

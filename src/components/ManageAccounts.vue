@@ -7,7 +7,7 @@ import LoadingOverlay from "./LoadingOverlay.vue";
 import API from "../utils/api";
 import {
 	UserPlus, Pencil, Archive, Search, X, User, BookOpen,
-	Lock, Eye, EyeOff, Users, Save, Mail
+	Lock, Eye, EyeOff, Users, Save, Mail, LayoutGrid, List
 } from "@lucide/vue";
 
 const props = defineProps({
@@ -21,6 +21,15 @@ const emit = defineEmits(["notify"]);
 
 const { request, isLoading } = useApi();
 
+const viewMode = ref(localStorage.getItem("manage_accounts_view_mode") || "card"); // 'card' | 'list'
+
+watch(viewMode, (newVal) => {
+	try {
+		localStorage.setItem("manage_accounts_view_mode", newVal);
+	} catch (e) {
+		console.error("Failed to save view mode", e);
+	}
+});
 const teachers = ref([]);
 const subjects = ref([]);
 const teacherCount = ref(0);
@@ -192,24 +201,57 @@ onMounted(() => {
 	<div class="space-y-6 animate-fade-up">
 		<!-- Toolbar -->
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-			<div class="relative flex-1 max-w-lg">
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<Search class="h-5 w-5 text-slate-400" />
+			<div class="flex flex-1 items-center gap-3 max-w-xl">
+				<div class="relative flex-1">
+					<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+						<Search class="h-5 w-5 text-slate-400" />
+					</div>
+					<input
+						v-model="manageSearch"
+						type="text"
+						placeholder="Search by name, subject, or email..."
+						class="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+					/>
+					<button
+						v-if="manageSearch"
+						@click="manageSearch = ''"
+						class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
+					>
+						<X class="h-4 w-4" />
+					</button>
 				</div>
-				<input
-					v-model="manageSearch"
-					type="text"
-					placeholder="Search by name, subject, or email..."
-					class="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-				/>
-				<button
-					v-if="manageSearch"
-					@click="manageSearch = ''"
-					class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
-				>
-					<X class="h-4 w-4" />
-				</button>
+
+				<!-- Layout Toggle -->
+				<div class="flex items-center rounded-xl border border-slate-200 bg-slate-100 p-1 flex-none">
+					<button
+						type="button"
+						@click="viewMode = 'card'"
+						:class="[
+							'flex items-center justify-center rounded-lg p-2 transition-all',
+							viewMode === 'card'
+								? 'bg-white text-indigo-600 shadow-xs font-bold'
+								: 'text-slate-500 hover:text-slate-800'
+						]"
+						title="Card View"
+					>
+						<LayoutGrid class="h-4 w-4" />
+					</button>
+					<button
+						type="button"
+						@click="viewMode = 'list'"
+						:class="[
+							'flex items-center justify-center rounded-lg p-2 transition-all',
+							viewMode === 'list'
+								? 'bg-white text-indigo-600 shadow-xs font-bold'
+								: 'text-slate-500 hover:text-slate-800'
+						]"
+						title="List View"
+					>
+						<List class="h-4 w-4" />
+					</button>
+				</div>
 			</div>
+
 			<button
 				@click="showCreateForm = true"
 				class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 whitespace-nowrap"
@@ -220,7 +262,7 @@ onMounted(() => {
 		</div>
 
 		<!-- Card Grid -->
-		<div v-if="filteredTeachers.length > 0" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		<div v-if="viewMode === 'card' && filteredTeachers.length > 0" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			<div
 				v-for="teacher in filteredTeachers"
 				:key="teacher.id"
@@ -281,6 +323,80 @@ onMounted(() => {
 						Archive
 					</button>
 				</div>
+			</div>
+		</div>
+
+		<!-- List Table View -->
+		<div v-else-if="viewMode === 'list' && filteredTeachers.length > 0" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+			<div class="overflow-x-auto">
+				<table class="w-full text-left text-sm text-slate-600">
+					<thead class="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
+						<tr>
+							<th scope="col" class="px-6 py-3.5">Teacher</th>
+							<th scope="col" class="px-6 py-3.5">ID / Term</th>
+							<th scope="col" class="px-6 py-3.5">Email</th>
+							<th scope="col" class="px-6 py-3.5 text-right">Actions</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						<tr
+							v-for="teacher in filteredTeachers"
+							:key="teacher.id"
+							class="transition-colors hover:bg-slate-50/80"
+						>
+							<td class="px-6 py-4">
+								<div class="flex items-center gap-3">
+									<div class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+										<User class="h-5 w-5" />
+									</div>
+									<div>
+										<div class="font-bold text-slate-900">
+											{{ teacher.firstname }} {{ teacher.lastname }}
+										</div>
+										<div class="text-xs text-slate-500">
+											{{ teacher.subject || "No subject assigned" }}
+										</div>
+									</div>
+								</div>
+							</td>
+							<td class="px-6 py-4">
+								<div class="text-xs font-semibold text-slate-700">
+									ID: {{ teacher.teacher_id || teacher.id }}
+								</div>
+								<div v-if="teacher.quarter && teacher.year" class="text-xs text-slate-500">
+									Q{{ teacher.quarter }} {{ teacher.year }}
+								</div>
+							</td>
+							<td class="px-6 py-4">
+								<div v-if="teacher.email" class="flex items-center gap-1.5 text-xs text-slate-600">
+									<Mail class="h-3.5 w-3.5 text-slate-400" />
+									{{ teacher.email }}
+								</div>
+								<span v-else class="text-xs text-slate-400">—</span>
+							</td>
+							<td class="px-6 py-4 text-right">
+								<div class="flex items-center justify-end gap-2">
+									<button
+										@click="startEdit(teacher)"
+										class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100"
+									>
+										<Pencil class="h-3.5 w-3.5" />
+										Edit
+									</button>
+									<button
+										@click="deleteTeacher(teacher.id)"
+										:disabled="teacher.id === currentTeacherId"
+										:title="teacher.id === currentTeacherId ? 'You cannot archive your own account' : 'Archive User'"
+										class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed"
+									>
+										<Archive class="h-3.5 w-3.5" />
+										Archive
+									</button>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
 		</div>
 

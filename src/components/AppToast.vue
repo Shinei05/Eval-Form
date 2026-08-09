@@ -11,7 +11,7 @@
       v-if="show"
       role="alert"
       :class="[
-        'fixed right-5 top-5 z-[10000] flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-2xl p-4 shadow-dialog',
+        'fixed top-4 left-3 right-3 sm:left-auto sm:right-5 z-[10000] flex w-auto sm:w-full sm:max-w-sm items-start gap-3 overflow-hidden rounded-2xl p-3.5 sm:p-4 shadow-dialog',
         styles.bg, styles.border
       ]"
     >

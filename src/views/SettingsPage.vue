@@ -22,13 +22,13 @@
 
     <div class="grid gap-6 md:grid-cols-2">
       <!-- Profile Card -->
-      <section class="rounded-2xl border border-line bg-white p-6 shadow-soft">
+      <section class="rounded-2xl border border-line bg-white p-4 sm:p-6 shadow-soft">
         <h3 class="text-lg font-bold text-ink">Profile Information</h3>
         <div class="mt-5 flex items-center gap-4 border-b border-line pb-5">
-          <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-lg font-extrabold text-indigo-700">
+          <div class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-lg font-extrabold text-indigo-700">
             {{ userInitials }}
           </div>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <h4 class="truncate text-base font-bold text-ink">
               {{ user.firstname }} {{ user.lastname }}
             </h4>
@@ -47,9 +47,9 @@
               <div
                 v-for="range in studentScoreRanges"
                 :key="'student-' + range.label"
-                class="flex items-center gap-3 text-xs"
+                class="flex items-center gap-2 sm:gap-3 text-xs"
               >
-                <span class="w-14 font-semibold text-ink-soft">{{ range.label }}</span>
+                <span class="w-14 shrink-0 font-semibold text-ink-soft">{{ range.label }}</span>
                 <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                   <div
                     class="h-full rounded-full transition-all duration-300"
@@ -61,7 +61,7 @@
                     }"
                   />
                 </div>
-                <span class="w-6 text-right font-bold text-ink">
+                <span class="w-6 shrink-0 text-right font-bold text-ink">
                   {{ studentEvaluations.filter(e => Number(e.avg) >= range.min && Number(e.avg) < range.max).length }}
                 </span>
               </div>
@@ -74,9 +74,9 @@
               <div
                 v-for="range in peerScoreRanges"
                 :key="'peer-' + range.label"
-                class="flex items-center gap-3 text-xs"
+                class="flex items-center gap-2 sm:gap-3 text-xs"
               >
-                <span class="w-14 font-semibold text-ink-soft">{{ range.label }}</span>
+                <span class="w-14 shrink-0 font-semibold text-ink-soft">{{ range.label }}</span>
                 <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                   <div
                     class="h-full rounded-full transition-all duration-300"
@@ -88,7 +88,7 @@
                     }"
                   />
                 </div>
-                <span class="w-6 text-right font-bold text-ink">
+                <span class="w-6 shrink-0 text-right font-bold text-ink">
                   {{ peerEvaluations.filter(e => Number(e.avg) >= range.min && Number(e.avg) < range.max).length }}
                 </span>
               </div>
@@ -98,7 +98,7 @@
       </section>
 
       <!-- Security Card -->
-      <section class="rounded-2xl border border-line bg-white p-6 shadow-soft">
+      <section class="rounded-2xl border border-line bg-white p-4 sm:p-6 shadow-soft">
         <h3 class="text-lg font-bold text-ink">Security Settings</h3>
         <p class="mt-1 text-sm text-ink-soft">
           Update your account password to ensure your evaluations remain secure.
