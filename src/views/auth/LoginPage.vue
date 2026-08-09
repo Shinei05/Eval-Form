@@ -75,6 +75,13 @@
       :error="loginError"
       @close="activeRole = null"
       @submit="handleSignInSubmit"
+      @forgot-password="openForgotPassword"
+    />
+
+    <!-- Forgot Password Modal -->
+    <ForgotPasswordModal
+      :open="showForgotPassword"
+      @close="showForgotPassword = false"
     />
 
     <!-- Policy Modal -->
@@ -93,6 +100,7 @@ import { roles } from '../../data/roles'
 import RoleCard from '../../components/auth/RoleCard.vue'
 import SignInModal from '../../components/auth/SignInModal.vue'
 import PolicyModal from '../../components/auth/PolicyModal.vue'
+import ForgotPasswordModal from '../../components/auth/ForgotPasswordModal.vue'
 import { useApi } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
 import { useToast } from '../../composables/useToast'
@@ -106,6 +114,12 @@ const { showToast } = useToast()
 const activeRole = ref(null)
 const activePolicy = ref(null)
 const loginError = ref('')
+const showForgotPassword = ref(false)
+
+function openForgotPassword() {
+  activeRole.value = null
+  showForgotPassword.value = true
+}
 
 async function handleSignInSubmit({ role, identifier, password }) {
   loginError.value = ''

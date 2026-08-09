@@ -1,7 +1,29 @@
 <template>
   <div class="w-full font-sans">
-    <!-- Loading overlay -->
-    <LoadingOverlay v-if="pageLoading" />
+    <!-- Skeleton Loading State (Matches Dashboard Layout) -->
+    <div v-if="pageLoading" class="animate-pulse space-y-6">
+      <div class="flex items-center gap-3">
+        <div class="h-12 w-12 rounded-2xl bg-slate-200"></div>
+        <div class="space-y-2">
+          <div class="h-7 w-48 rounded-lg bg-slate-200"></div>
+          <div class="h-4 w-32 rounded-lg bg-slate-200"></div>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+        <div class="h-28 rounded-2xl bg-slate-200"></div>
+      </div>
+      <div class="h-16 rounded-2xl bg-slate-200"></div>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+        <div class="h-44 rounded-2xl bg-slate-200"></div>
+      </div>
+    </div>
 
     <template v-else>
       <div class="animate-fade-up">
@@ -189,12 +211,12 @@ import {
 } from '@lucide/vue'
 import StatCard from '../../components/dashboard/StatCard.vue'
 import TeacherCard from '../../components/dashboard/TeacherCard.vue'
-import LoadingOverlay from '../../components/LoadingOverlay.vue'
 import Pagination from '../../components/Pagination.vue'
 import { useApi } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
 import { getUserData } from '../../utils/auth'
 import API from '../../utils/api'
+import { getSchoolLevelCategory, formatGradeSection } from '../../utils/academic'
 
 const router = useRouter()
 const { request } = useApi()
@@ -208,7 +230,18 @@ const userProfile = ref({
   firstname: '',
   lastname: '',
   fullname: '',
+  grade: null,
+  section: null,
   isVerified: true,
+})
+
+const schoolLevel = computed(() => getSchoolLevelCategory(userProfile.value.grade))
+const gradeSection = computed(() => formatGradeSection(userProfile.value.grade, userProfile.value.section))
+const schoolLevelBadgeClass = computed(() => {
+  if (schoolLevel.value === 'Elementary') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (schoolLevel.value === 'Junior High School') return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+  if (schoolLevel.value === 'Senior High School') return 'bg-purple-50 text-purple-700 border-purple-200'
+  return 'bg-slate-100 text-slate-700 border-slate-200'
 })
 
 // Fix 5: derive verified state from profile — no extra API call needed
@@ -315,6 +348,8 @@ async function loadProfile() {
       firstname: profile.firstname || '',
       lastname: profile.lastname || '',
       fullname: profile.fullname || '',
+      grade: profile.grade || null,
+      section: profile.section || null,
       // Fix 5: read isVerified directly from profile — avoids the extra verificationCheck call
       isVerified: profile.isVerified !== undefined ? profile.isVerified : true,
     }

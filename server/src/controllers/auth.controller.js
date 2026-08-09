@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import pool from "../config/supabase.js";
 import { getRandomString, getCurrentPeriod } from "../utils/helpers.js";
 import { sendEmail } from "../utils/email.js";
@@ -33,14 +34,24 @@ export async function getProfile(req, res) {
 		let lastname = "";
 		let studentId = null;
 		let teacherId = null;
+		let grade = null;
+		let section = null;
+		let studId = null;
 		let subject = null;
 		let quarter = null;
 		let year = null;
+		let subjectName = null;
+		let identifier = null;
+		let isElementary = false;
+		let isJhs = false;
 
 		if (user.is_admin) {
 			role = "Admin";
 			const { rows } = await pool.query(
-				"SELECT id, firstname, lastname, subject, quarter, year FROM teachers WHERE usr_id = $1 LIMIT 1",
+				`SELECT t.id, t.firstname, t.lastname, t.subject, s.subjects AS subject_name, t.quarter, t.year, t.identifier, t.is_elementary, t.is_jhs 
+				 FROM teachers t 
+				 LEFT JOIN subjects s ON s.id = t.subject 
+				 WHERE t.usr_id = $1 LIMIT 1`,
 				[user.id],
 			);
 			const admin = rows[0];
@@ -49,13 +60,20 @@ export async function getProfile(req, res) {
 				firstname = admin.firstname || "";
 				lastname = admin.lastname || "";
 				subject = admin.subject || null;
+				subjectName = admin.subject_name || null;
 				quarter = admin.quarter || null;
 				year = admin.year || null;
+				identifier = admin.identifier || null;
+				isElementary = Boolean(admin.is_elementary);
+				isJhs = Boolean(admin.is_jhs);
 			}
 		} else if (user.is_teacher) {
 			role = "Teacher";
 			const { rows } = await pool.query(
-				"SELECT id, firstname, lastname, subject, quarter, year FROM teachers WHERE usr_id = $1 LIMIT 1",
+				`SELECT t.id, t.firstname, t.lastname, t.subject, s.subjects AS subject_name, t.quarter, t.year, t.identifier, t.is_elementary, t.is_jhs 
+				 FROM teachers t 
+				 LEFT JOIN subjects s ON s.id = t.subject 
+				 WHERE t.usr_id = $1 LIMIT 1`,
 				[user.id],
 			);
 			const teacher = rows[0];
@@ -68,11 +86,15 @@ export async function getProfile(req, res) {
 			firstname = teacher.firstname || "";
 			lastname = teacher.lastname || "";
 			subject = teacher.subject || null;
+			subjectName = teacher.subject_name || null;
 			quarter = teacher.quarter || null;
 			year = teacher.year || null;
+			identifier = teacher.identifier || null;
+			isElementary = Boolean(teacher.is_elementary);
+			isJhs = Boolean(teacher.is_jhs);
 		} else {
 			const { rows } = await pool.query(
-				"SELECT id, firstname, lastname, grade, section FROM students WHERE usr_id = $1 LIMIT 1",
+				"SELECT id, firstname, lastname, grade, section, stud_id FROM students WHERE usr_id = $1 LIMIT 1",
 				[user.id],
 			);
 			const student = rows[0];
@@ -84,6 +106,9 @@ export async function getProfile(req, res) {
 			studentId = student.id;
 			firstname = student.firstname || "";
 			lastname = student.lastname || "";
+			grade = student.grade || null;
+			section = student.section || null;
+			studId = student.stud_id || null;
 		}
 
 		const fullname = `${firstname} ${lastname}`.trim();
@@ -99,9 +124,16 @@ export async function getProfile(req, res) {
 				fullname,
 				studentId,
 				teacherId,
+				grade,
+				section,
+				studId,
 				subject,
+				subjectName,
 				quarter,
 				year,
+				identifier,
+				isElementary,
+				isJhs,
 				isVerified: user.is_verified,
 			},
 		});
@@ -353,7 +385,7 @@ export async function resetPassword(req, res) {
 		const { email } = req.body;
 
 		const { rows } = await pool.query(
-			"SELECT reset FROM users WHERE email = $1 LIMIT 1",
+			"SELECT id FROM users WHERE email = $1 LIMIT 1",
 			[email],
 		);
 		const user = rows[0];
@@ -364,15 +396,21 @@ export async function resetPassword(req, res) {
 				.json({ success: false, message: "Email not found" });
 		}
 
-		const code = user.reset;
+		// Generate a fresh 6-digit numeric OTP each time
+		const bytes = crypto.randomBytes(4);
+		const otp = (bytes.readUInt32BE(0) % 900000 + 100000).toString();
+
+		// Persist the OTP so verifyResetCode can match it
+		await pool.query("UPDATE users SET reset = $1 WHERE email = $2", [otp, email]);
+
 		const html = `
     <center style="font-family: Arial, sans-serif; background: #ffffff; padding: 40px 20px; margin: 0;">
       <div style="max-width: 500px; text-align: center;">
         <br>
-        <h2 style="color: #2d3748; font-size: 22px; margin-bottom: 25px; font-weight: 600;">Enter this code to reset your password</h2>
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 25px 0; border: 2px solid #e2e8f0; display: inline-block;">
-          <h1 style="color: #2d3748; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace;">
-            ${code}
+        <h2 style="color: #2d3748; font-size: 22px; margin-bottom: 25px; font-weight: 600;">Enter this 6-digit code to reset your password</h2>
+        <div style="background: #f8f9fa; padding: 20px 32px; border-radius: 10px; margin: 25px 0; border: 2px solid #e2e8f0; display: inline-block;">
+          <h1 style="color: #2d3748; font-size: 40px; font-weight: bold; letter-spacing: 16px; margin: 0; font-family: 'Courier New', monospace;">
+            ${otp}
           </h1>
         </div>
         <br>
@@ -384,7 +422,7 @@ export async function resetPassword(req, res) {
         </div>
       </div>
     </center>`;
-		const text = "Enter this code to reset your password: " + code;
+		const text = "Enter this 6-digit code to reset your password: " + otp;
 
 		const sent = await sendEmail(email, html, text);
 		if (!sent) {

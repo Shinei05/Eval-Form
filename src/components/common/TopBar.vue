@@ -18,19 +18,23 @@
         </router-link>
 
         <div class="relative" ref="containerRef">
-        <!-- Mobile Circular Profile Button -->
+        <!-- Mobile Profile Button with Dropdown Indicator -->
         <button
           type="button"
           @click="open = !open"
           aria-haspopup="menu"
           :aria-expanded="open"
-          class="relative flex sm:hidden h-10 w-10 items-center justify-center rounded-full border border-line bg-white shadow-soft transition-colors hover:bg-slate-50"
+          class="flex sm:hidden items-center gap-1 rounded-full border border-line bg-white p-1 pr-2 shadow-soft transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           :title="userName"
         >
-          <span :class="['absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white', theme.accent]" aria-hidden="true" />
-          <span class="text-xs font-extrabold text-ink">
+          <div class="relative flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-extrabold text-ink">
             {{ userInitials }}
-          </span>
+            <span :class="['absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white', theme.accent]" aria-hidden="true" />
+          </div>
+          <ChevronDown
+            :class="['h-3.5 w-3.5 flex-none text-ink-muted transition-transform duration-200', open ? 'rotate-180' : '']"
+            aria-hidden="true"
+          />
         </button>
 
         <!-- Desktop Full Pill Button -->

@@ -213,10 +213,36 @@ const teacherTagalogTranslations = {
 
 <template>
 	<div class="eval-result-page">
-		<!-- Loading -->
-		<div v-if="isLoading" class="loading-screen">
-			<div class="spinner"></div>
-			<p>Loading evaluation…</p>
+		<!-- Skeleton Loading State (Matches A4 Printable Document Layout) -->
+		<div v-if="isLoading" class="result-skeleton-wrapper">
+			<div class="toolbar-sk no-print">
+				<div class="sk-pill sk-w-28"></div>
+				<div class="sk-pill sk-w-44"></div>
+				<div class="sk-pill sk-w-24"></div>
+			</div>
+			<div class="a4-page sk-page">
+				<div class="sk-header">
+					<div class="sk-logo"></div>
+					<div class="sk-header-lines">
+						<div class="sk-line sk-w-60"></div>
+						<div class="sk-line sk-w-80"></div>
+						<div class="sk-line sk-w-90"></div>
+					</div>
+					<div class="sk-logo"></div>
+				</div>
+				<div class="sk-title-block">
+					<div class="sk-line sk-w-70 sk-h-6"></div>
+					<div class="sk-line sk-w-40"></div>
+				</div>
+				<div class="sk-grid-meta">
+					<div class="sk-card sk-h-16 mb-4"></div>
+				</div>
+				<div class="sk-cat-list">
+					<div class="sk-card sk-h-20 mb-3"></div>
+					<div class="sk-card sk-h-20 mb-3"></div>
+					<div class="sk-card sk-h-20 mb-3"></div>
+				</div>
+			</div>
 		</div>
 
 		<!-- Toolbar (hidden in print) -->
@@ -657,6 +683,97 @@ const teacherTagalogTranslations = {
 	font-size: 0.7rem;
 	line-height: 1.4;
 	color: #555;
+}
+
+/* ── Skeleton Loaders ────────────────────────── */
+@keyframes shimmer {
+	0% { opacity: 0.45; }
+	50% { opacity: 0.85; }
+	100% { opacity: 0.45; }
+}
+
+.result-skeleton-wrapper {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: 100%;
+	animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.toolbar-sk {
+	width: fit-content;
+	min-width: 210mm;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background: #ffffff;
+	padding: 1rem 1.5rem;
+	border-radius: 12px;
+	margin-bottom: 1.5rem;
+	border: 1px solid #e2e8f0;
+}
+
+.sk-page {
+	background: #ffffff !important;
+	border: 1px solid #e2e8f0 !important;
+}
+
+.sk-pill {
+	height: 1.5rem;
+	background: #e2e8f0;
+	border-radius: 999px;
+}
+.sk-w-24 { width: 6rem; }
+.sk-w-28 { width: 7rem; }
+.sk-w-44 { width: 11rem; }
+.sk-w-60 { width: 15rem; }
+.sk-w-70 { width: 17.5rem; }
+.sk-w-80 { width: 20rem; }
+.sk-w-90 { width: 22.5rem; }
+
+.sk-h-5 { height: 1.25rem; }
+.sk-h-6 { height: 1.5rem; }
+.sk-h-16 { height: 4rem; }
+.sk-h-20 { height: 5rem; }
+
+.sk-header {
+	display: flex;
+	align-items: center;
+	gap: 1.5rem;
+	padding-bottom: 1rem;
+	border-bottom: 2px solid #e2e8f0;
+	margin-bottom: 1.5rem;
+}
+.sk-logo {
+	width: 4.5rem;
+	height: 4.5rem;
+	background: #e2e8f0;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.sk-header-lines {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+}
+.sk-line {
+	height: 0.75rem;
+	background: #e2e8f0;
+	border-radius: 4px;
+}
+.sk-title-block {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 1.5rem;
+}
+.sk-card {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
 }
 
 /* ── Loading ────────────────────────────────────────── */
