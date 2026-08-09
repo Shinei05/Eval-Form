@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import API from "../../utils/api";
 import { useApi } from "../../composables/useApi";
@@ -160,6 +160,19 @@ onMounted(async () => {
 	isLoading.value = false;
 });
 
+// Maps each question_id (DB PK) → its 1-based sequential position across all headers.
+// The teacherTagalogTranslations object is keyed 1–34 by order, not by DB primary key.
+const questionSequenceMap = computed(() => {
+	const map = {};
+	let seq = 1;
+	for (const h of headers.value) {
+		for (const q of h.questions || []) {
+			map[q.question_id] = seq++;
+		}
+	}
+	return map;
+});
+
 const teacherTagalogTranslations = {
 	1: "(Maagang Pag-uulat sa Trabaho at Klase — Palaging dumarating sa tamang oras para sa klase, pulong, at iba pang pangakong propesyonal.)",
 	2: "(Pagdalo sa Klase at Pagiging Available — Regular na dumadalo sa nakatakdang klase at oras ng opisina, pinapaliit ang mga hindi inaasahang pagliban.)",
@@ -208,8 +221,8 @@ const teacherTagalogTranslations = {
 
 		<!-- Toolbar (hidden in print) -->
 		<div class="toolbar no-print">
-			<router-link to="/principal" class="btn-back"
-				>← Back to Dashboard</router-link
+			<button type="button" @click="$router.back()" class="btn-back"
+				>← Back</button
 			>
 			<span class="badge-mode"
 				>{{
@@ -316,8 +329,8 @@ const teacherTagalogTranslations = {
 						<tr v-for="q in h.questions" :key="q.question_id">
 							<td>
 								<div class="q-main">{{ q.question }}</div>
-								<div v-if="type === 'teacher' && teacherTagalogTranslations[q.question_id]" class="q-tagalog">
-									{{ teacherTagalogTranslations[q.question_id] }}
+								<div v-if="type === 'teacher' && teacherTagalogTranslations[questionSequenceMap[q.question_id]]" class="q-tagalog">
+									{{ teacherTagalogTranslations[questionSequenceMap[q.question_id]] }}
 								</div>
 							</td>
 							<td class="center">
@@ -400,6 +413,10 @@ const teacherTagalogTranslations = {
 	color: var(--color-primary, #4f46e5);
 	text-decoration: none;
 	font-weight: 500;
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
 }
 .btn-back:hover {
 	text-decoration: underline;

@@ -20,6 +20,8 @@ const AdminDashboard = () => import("../views/admin/AdminDashboard.vue");
 const SchedulerPage = () => import("../views/admin/SchedulerPage.vue");
 const FileUploadPage = () => import("../views/admin/FileUploadPage.vue");
 const QuestionsPage = () => import("../views/admin/QuestionsPage.vue");
+const AnnouncementsPage = () => import("../views/admin/AnnouncementsPage.vue");
+const AnnouncementBoard = () => import("../views/AnnouncementBoard.vue");
 
 const SettingsPage = () => import("../views/SettingsPage.vue");
 
@@ -75,6 +77,12 @@ const routes = [
 				component: SettingsPage,
 				meta: { title: "Student Settings", requiresAuth: true },
 			},
+			{
+				path: "announcements",
+				name: "StudentAnnouncements",
+				component: AnnouncementBoard,
+				meta: { title: "Announcement Board", requiresAuth: true },
+			},
 		],
 	},
 	{
@@ -102,6 +110,12 @@ const routes = [
 				name: "TeacherSettings",
 				component: SettingsPage,
 				meta: { title: "Teacher Settings", requiresAuth: true },
+			},
+			{
+				path: "announcements",
+				name: "TeacherAnnouncements",
+				component: AnnouncementBoard,
+				meta: { title: "Announcement Board", requiresAuth: true },
 			},
 		],
 	},
@@ -136,6 +150,12 @@ const routes = [
 				name: "admin-file-upload",
 				component: FileUploadPage,
 				meta: { title: "Upload CSV" },
+			},
+			{
+				path: "announcements",
+				name: "admin-announcements",
+				component: AnnouncementsPage,
+				meta: { title: "Announcements" },
 			},
 			{
 				path: "questions-student",

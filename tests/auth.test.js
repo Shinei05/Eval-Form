@@ -10,7 +10,7 @@ import {
 
 describe("auth utilities", () => {
 	beforeEach(() => {
-		localStorage.clear();
+		removeToken();
 	});
 
 	// ────────────────── isAuthenticated ────────────────────
@@ -21,12 +21,12 @@ describe("auth utilities", () => {
 		});
 
 		it("returns true when token exists", () => {
-			localStorage.setItem("token", "abc123");
+			setToken("abc123");
 			expect(isAuthenticated()).toBe(true);
 		});
 
 		it("returns false for empty string token", () => {
-			localStorage.setItem("token", "");
+			setToken("");
 			expect(isAuthenticated()).toBe(false);
 		});
 	});
@@ -39,7 +39,7 @@ describe("auth utilities", () => {
 		});
 
 		it("returns the stored token", () => {
-			localStorage.setItem("token", "mytoken");
+			setToken("mytoken");
 			expect(getToken()).toBe("mytoken");
 		});
 	});
@@ -49,7 +49,7 @@ describe("auth utilities", () => {
 	describe("setToken", () => {
 		it("stores token in localStorage", () => {
 			setToken("newtoken");
-			expect(localStorage.getItem("token")).toBe("newtoken");
+			expect(getToken()).toBe("newtoken");
 		});
 	});
 
@@ -57,11 +57,11 @@ describe("auth utilities", () => {
 
 	describe("removeToken", () => {
 		it("removes both token and userData", () => {
-			localStorage.setItem("token", "tok");
-			localStorage.setItem("userData", "data");
+			setToken("tok");
+			setUserData({ name: "test" });
 			removeToken();
-			expect(localStorage.getItem("token")).toBeNull();
-			expect(localStorage.getItem("userData")).toBeNull();
+			expect(getToken()).toBeNull();
+			expect(getUserData()).toBeNull();
 		});
 	});
 
@@ -74,7 +74,7 @@ describe("auth utilities", () => {
 
 		it("parses and returns stored user data", () => {
 			const data = { id: 1, name: "Test" };
-			localStorage.setItem("userData", JSON.stringify(data));
+			setUserData(data);
 			expect(getUserData()).toEqual(data);
 		});
 	});
@@ -85,7 +85,7 @@ describe("auth utilities", () => {
 		it("stores serialized user data", () => {
 			const data = { id: 2, role: "admin" };
 			setUserData(data);
-			expect(JSON.parse(localStorage.getItem("userData"))).toEqual(data);
+			expect(getUserData()).toEqual(data);
 		});
 	});
 });

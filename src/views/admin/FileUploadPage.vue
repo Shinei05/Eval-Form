@@ -6,6 +6,7 @@ import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import AppToast from "../../components/AppToast.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { UploadCloud, FileText, Download, Info, X } from "@lucide/vue";
 
 const { isLoading } = useApi();
 const { requireAuth } = useAuth();
@@ -71,347 +72,145 @@ onMounted(() => {
 	<LoadingOverlay v-if="loading" />
 	<AppToast v-bind="toast" @update:visible="toast.visible = $event" />
 
-	<div class="upload-page">
-		<h2 class="page-title">CSV File Upload</h2>
-		<p class="page-desc">
-			Import student accounts and teacher assignments via CSV file
-		</p>
+	<div class="animate-fade-up space-y-6">
+		<div class="flex items-center gap-3">
+			<div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 shadow-sm">
+				<UploadCloud class="h-6 w-6" />
+			</div>
+			<div>
+				<h2 class="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">CSV File Upload</h2>
+				<p class="mt-1 text-sm text-slate-500">
+					Import student accounts and teacher assignments via CSV file
+				</p>
+			</div>
+		</div>
 
-		<div class="upload-layout">
-			<div class="upload-card card">
+		<div class="grid gap-6 lg:grid-cols-2 items-start">
+			<!-- Upload Card -->
+			<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
 				<div
-					class="drop-zone"
-					:class="{ active: dragActive, 'has-file': file }"
+					class="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-10 text-center transition-all cursor-pointer mb-6"
+					:class="{
+						'border-indigo-400 bg-indigo-50': dragActive,
+						'border-emerald-400 bg-emerald-50': file && !dragActive,
+						'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-slate-100': !dragActive && !file
+					}"
 					@dragover.prevent="dragActive = true"
 					@dragleave.prevent="dragActive = false"
 					@drop.prevent="onDrop"
 				>
-					<span class="material-icons drop-icon">{{
-						file ? "description" : "cloud_upload"
-					}}</span>
-					<p v-if="!file" class="drop-text">
-						Drag & drop a CSV file here, or click to browse
-					</p>
-					<p v-else class="drop-text file-name">{{ file.name }}</p>
-					<span v-if="file" class="file-size"
-						>{{ (file.size / 1024).toFixed(1) }} KB</span
-					>
+					<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+						<FileText v-if="file" class="h-8 w-8 text-emerald-500" />
+						<UploadCloud v-else class="h-8 w-8 text-indigo-500" />
+					</div>
+					
+					<div v-if="!file">
+						<p class="text-sm font-semibold text-slate-700">
+							Drag & drop a CSV file here
+						</p>
+						<p class="text-xs text-slate-500 mt-1">or click to browse</p>
+					</div>
+					<div v-else>
+						<p class="text-sm font-semibold text-slate-900">{{ file.name }}</p>
+						<p class="text-xs text-slate-500 mt-1">{{ (file.size / 1024).toFixed(1) }} KB</p>
+					</div>
 
 					<input
 						type="file"
 						accept=".csv"
-						class="file-input"
+						class="absolute inset-0 cursor-pointer opacity-0"
 						@change="onFileChange"
 					/>
 				</div>
 
-				<div class="upload-actions">
+				<div class="flex gap-3">
 					<button
-						class="btn btn-primary"
+						class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
 						@click="upload"
 						:disabled="!file"
 					>
-						<span class="material-icons" style="font-size: 1.125rem"
-							>upload</span
-						>
+						<UploadCloud class="h-4 w-4" />
 						Upload
 					</button>
-					<button v-if="file" class="btn btn-ghost" @click="file = null">
+					<button
+						v-if="file"
+						class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+						@click="file = null"
+					>
+						<X class="h-4 w-4" />
 						Clear
 					</button>
 				</div>
 			</div>
 
-			<div class="format-guide card">
-				<h3 class="guide-title">CSV Format Guide</h3>
-				<p class="guide-desc">
+			<!-- Format Guide Card -->
+			<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+				<div class="mb-4 flex items-center gap-2">
+					<Info class="h-5 w-5 text-indigo-500" />
+					<h3 class="text-base font-bold text-slate-900">CSV Format Guide</h3>
+				</div>
+				<p class="text-sm text-slate-500 mb-6">
 					Each row represents one student → teacher assignment. Student and teacher accounts are automatically created if they do not exist.
 				</p>
-				<div class="columns-grid">
-					<div class="col-item">
-						<span class="col-num">1</span>
-						<strong>student_email</strong>
+				
+				<div class="mb-6 space-y-5 rounded-xl border border-slate-100 bg-slate-50 p-5">
+					<div>
+						<h4 class="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Student Details (Columns 1-7)</h4>
+						<div class="flex flex-wrap gap-2">
+							<span v-for="(col, idx) in ['email', 'firstname', 'lastname', 'id', 'grade', 'section', 'password']" :key="col" class="inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-sm border border-slate-200">
+								<span class="font-mono text-[10px] font-bold text-indigo-500">{{ idx + 1 }}</span>
+								student_{{ col }}
+							</span>
+						</div>
 					</div>
-					<div class="col-item">
-						<span class="col-num">2</span> <strong>student_firstname</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">3</span> <strong>student_lastname</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">4</span> <strong>student_id</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">5</span> <strong>student_grade</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">6</span> <strong>student_section</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">7</span> <strong>student_password</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">8</span>
-						<strong>teacher_email</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">9</span> <strong>teacher_firstname</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">10</span> <strong>teacher_lastname</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">11</span> <strong>teacher_password</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">12</span> <strong>subject_name</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">13</span> <strong>quarter</strong>
-					</div>
-					<div class="col-item">
-						<span class="col-num">14</span> <strong>year</strong>
+					<div>
+						<h4 class="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">Teacher & Class Details (Columns 8-14)</h4>
+						<div class="flex flex-wrap gap-2">
+							<span v-for="(col, idx) in ['teacher_email', 'teacher_firstname', 'teacher_lastname', 'teacher_password', 'subject_name', 'quarter', 'year']" :key="col" class="inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-sm border border-slate-200">
+								<span class="font-mono text-[10px] font-bold text-emerald-500">{{ idx + 8 }}</span>
+								{{ col }}
+							</span>
+						</div>
 					</div>
 				</div>
-				<div class="example-box">
-					<code>student1@school.edu,Juan,Dela Cruz,20001,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026</code>
+
+				<div class="mb-6 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-inner">
+					<div class="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Example Row</div>
+					<code class="text-xs text-emerald-400 whitespace-nowrap font-mono">student1@school.edu,Juan,Dela Cruz,20001,11,Block A,p@ss123,teacher1@test.com,Jane,Doe,t@ach123,Mathematics,1,2026</code>
 				</div>
-				<ul class="guide-notes">
-					<li>
-						Header row (<code>student_email,...</code>) is auto-detected and skipped
+
+				<ul class="space-y-2 mb-6">
+					<li class="flex items-start gap-2 text-sm text-slate-600">
+						<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300"></span>
+						<span>Header row (<code class="bg-slate-100 px-1 py-0.5 rounded text-xs text-slate-700">student_email,...</code>) is auto-detected and skipped</span>
 					</li>
-					<li>
-						New student and teacher accounts are auto-created if they don't exist
+					<li class="flex items-start gap-2 text-sm text-slate-600">
+						<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300"></span>
+						<span>New student and teacher accounts are auto-created if they don't exist</span>
 					</li>
-					<li>
-						If a student already exists, their grade and section are updated
+					<li class="flex items-start gap-2 text-sm text-slate-600">
+						<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300"></span>
+						<span>If a student already exists, their grade and section are updated</span>
 					</li>
-					<li>
-						If a teacher already exists, their elementary/JHS flags are updated based on grade assignment
+					<li class="flex items-start gap-2 text-sm text-slate-600">
+						<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300"></span>
+						<span>If a teacher already exists, their elementary/JHS flags are updated based on grade assignment</span>
 					</li>
-					<li>Duplicate student-teacher assignments are skipped automatically</li>
+					<li class="flex items-start gap-2 text-sm text-slate-600">
+						<span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300"></span>
+						<span>Duplicate student-teacher assignments are skipped automatically</span>
+					</li>
 				</ul>
 
 				<a
 					href="/Test_CSV.csv"
 					download="Test_CSV.csv"
-					class="download-template"
+					class="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-600 transition-colors hover:bg-indigo-100 border border-indigo-100"
 				>
-					<span class="material-icons" style="font-size: 1.125rem"
-						>download</span
-					>
+					<Download class="h-4 w-4" />
 					Download Example CSV
 				</a>
 			</div>
 		</div>
 	</div>
 </template>
-
-<style scoped>
-.upload-page {
-	animation: fadeIn 0.3s ease;
-}
-
-.page-title {
-	font-size: 1.25rem;
-	margin-bottom: var(--space-1);
-}
-
-.page-desc {
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
-	margin-bottom: var(--space-6);
-}
-
-.upload-layout {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: var(--space-6);
-	align-items: start;
-}
-
-.upload-card {
-	padding: var(--space-6);
-}
-
-.drop-zone {
-	position: relative;
-	border: 2px dashed var(--color-border);
-	border-radius: var(--radius-lg);
-	padding: var(--space-10);
-	text-align: center;
-	cursor: pointer;
-	transition: all var(--transition-base);
-	margin-bottom: var(--space-5);
-}
-
-.drop-zone:hover,
-.drop-zone.active {
-	border-color: var(--color-primary);
-	background: var(--color-primary-50);
-}
-
-.drop-zone.has-file {
-	border-color: var(--color-success);
-	background: var(--color-success-light);
-}
-
-.drop-icon {
-	font-size: 3rem;
-	color: var(--color-text-muted);
-	margin-bottom: var(--space-3);
-	display: block;
-}
-
-.has-file .drop-icon {
-	color: var(--color-success);
-}
-
-.drop-text {
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
-}
-
-.file-name {
-	font-weight: 600;
-	color: var(--color-text);
-}
-
-.file-size {
-	font-size: 0.75rem;
-	color: var(--color-text-muted);
-}
-
-.file-input {
-	position: absolute;
-	inset: 0;
-	opacity: 0;
-	cursor: pointer;
-}
-
-.upload-actions {
-	display: flex;
-	gap: var(--space-3);
-}
-
-.btn {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-}
-
-/* ── Format Guide ─────────────────────────── */
-.format-guide {
-	padding: var(--space-6);
-}
-
-.guide-title {
-	font-size: 1rem;
-	font-weight: 600;
-	margin-bottom: var(--space-2);
-}
-
-.guide-desc {
-	font-size: 0.8125rem;
-	color: var(--color-text-muted);
-	margin-bottom: var(--space-4);
-}
-
-.columns-grid {
-	display: grid;
-	grid-template-columns: repeat(2, 1fr);
-	gap: var(--space-2);
-	margin-bottom: var(--space-4);
-}
-
-.col-item {
-	font-size: 0.8125rem;
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-}
-
-.col-num {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.25rem;
-	height: 1.25rem;
-	border-radius: 50%;
-	background: var(--color-primary-50, #eef2ff);
-	color: var(--color-primary, #4f46e5);
-	font-size: 0.6875rem;
-	font-weight: 600;
-	flex-shrink: 0;
-}
-
-.example-box {
-	background: #f8fafc;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	padding: var(--space-3);
-	margin-bottom: var(--space-4);
-	overflow-x: auto;
-}
-
-.example-box code {
-	font-size: 0.75rem;
-	white-space: nowrap;
-	color: var(--color-text);
-}
-
-.guide-notes {
-	list-style: none;
-	padding: 0;
-	margin: 0;
-}
-
-.guide-notes li {
-	font-size: 0.8125rem;
-	color: var(--color-text-muted);
-	padding: var(--space-1) 0;
-	padding-left: 1rem;
-	position: relative;
-}
-
-.guide-notes li::before {
-	content: "•";
-	position: absolute;
-	left: 0;
-	color: var(--color-text-muted);
-}
-
-.guide-notes code {
-	font-size: 0.75rem;
-	background: #f1f5f9;
-	padding: 1px 4px;
-	border-radius: 3px;
-}
-
-.download-template {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-	margin-top: var(--space-4);
-	padding: var(--space-2) var(--space-4);
-	font-size: 0.8125rem;
-	font-weight: 600;
-	color: var(--color-primary);
-	background: var(--color-primary-50);
-	border: 1px solid var(--color-primary);
-	border-radius: var(--radius-md);
-	text-decoration: none;
-	transition: all var(--transition-base);
-}
-
-.download-template:hover {
-	background: var(--color-primary);
-	color: #fff;
-}
-
-@media (max-width: 900px) {
-	.upload-layout {
-		grid-template-columns: 1fr;
-	}
-}
-</style>

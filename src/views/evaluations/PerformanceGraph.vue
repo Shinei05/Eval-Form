@@ -163,8 +163,8 @@ onMounted(async () => {
 
 		<!-- Back link -->
 		<div class="toolbar">
-			<router-link to="/principal" class="btn-back"
-				>← Back to Dashboard</router-link
+			<button type="button" @click="$router.back()" class="btn-back"
+				>← Back</button
 			>
 			<span class="page-label">
 				Performance —
@@ -254,6 +254,10 @@ onMounted(async () => {
 	color: var(--color-primary, #4f46e5);
 	text-decoration: none;
 	font-weight: 500;
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
 }
 
 .btn-back:hover {

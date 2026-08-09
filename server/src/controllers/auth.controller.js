@@ -127,7 +127,7 @@ export async function loginStudent(req, res) {
 		if (!user) {
 			return res
 				.status(400)
-				.json({ success: false, error: "Email not found" });
+				.json({ success: false, error: "Invalid Credentials" });
 		}
 
 		// Verify password first
@@ -175,6 +175,7 @@ export async function loginStudent(req, res) {
 			userData: {
 				id: student.id,
 				email: user.email,
+				role: 'Student',
 				firstname: student.firstname,
 				lastname: student.lastname,
 				fullname: `${student.firstname} ${student.lastname}`.trim(),
@@ -205,7 +206,7 @@ export async function loginTeacher(req, res) {
 		if (!user) {
 			return res
 				.status(400)
-				.json({ success: false, error: "Email not found" });
+				.json({ success: false, error: "Invalid Credentials" });
 		}
 
 		// Verify password first
@@ -253,6 +254,7 @@ export async function loginTeacher(req, res) {
 			userData: {
 				id: user.id,
 				email: user.email,
+				role: 'Teacher',
 				firstname: teacher.firstname,
 				lastname: teacher.lastname,
 				fullname: `${teacher.firstname} ${teacher.lastname}`.trim(),
@@ -284,7 +286,7 @@ export async function loginAdmin(req, res) {
 		if (!user) {
 			return res
 				.status(400)
-				.json({ success: false, error: "Email not found" });
+				.json({ success: false, error: "Invalid Credentials" });
 		}
 
 		const valid = await bcrypt.compare(password, user.password);
@@ -322,6 +324,7 @@ export async function loginAdmin(req, res) {
 			userData: {
 				id: user.id,
 				email: user.email,
+				role: 'Admin',
 				firstname: teacher.firstname,
 				lastname: teacher.lastname,
 				fullname: `${teacher.firstname} ${teacher.lastname}`.trim(),

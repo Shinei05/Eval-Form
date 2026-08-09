@@ -4,8 +4,13 @@ import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import AppToast from "../../components/AppToast.vue";
+import ConfirmModal from "../../components/ConfirmModal.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { 
+	UploadCloud, Plus, Pencil, Trash2, X, CheckCircle2, Info, 
+	FileText, Loader2, Save, FileQuestion, PlusCircle, Check
+} from "@lucide/vue";
 
 const props = defineProps({
 	type: { type: String, default: "student" },
@@ -18,6 +23,11 @@ const toast = ref({ visible: false, message: "", type: "info" });
 function notify(msg, type = "info") {
 	toast.value = { visible: true, message: msg, type };
 }
+
+const showDeleteHeaderModal = ref(false);
+const headerToDelete = ref(null);
+const showDeleteQuestionModal = ref(false);
+const questionToDelete = ref(null);
 
 const headers = ref([]);
 const headerVersion = ref(null);
@@ -202,10 +212,15 @@ async function addHeader() {
 	}
 }
 
-async function deleteHeader(headerId) {
-	if (!confirm("Delete this entire section and all its questions?")) return;
+function deleteHeader(headerId) {
+	headerToDelete.value = headerId;
+	showDeleteHeaderModal.value = true;
+}
+
+async function executeDeleteHeader() {
+	if (!headerToDelete.value) return;
 	const result = await request(api.value.headerDelete, {
-		body: { action: "deleteHeader", header_id: headerId },
+		body: { action: "deleteHeader", header_id: headerToDelete.value },
 	});
 	if (result.success) {
 		notify("Header deleted", "success");
@@ -213,6 +228,8 @@ async function deleteHeader(headerId) {
 	} else {
 		notify("Failed to delete header", "error");
 	}
+	showDeleteHeaderModal.value = false;
+	headerToDelete.value = null;
 }
 
 async function updateQuestion(question) {
@@ -232,10 +249,15 @@ async function updateQuestion(question) {
 	}
 }
 
-async function deleteQuestion(qId) {
-	if (!confirm("Delete this question?")) return;
+function deleteQuestion(qId) {
+	questionToDelete.value = qId;
+	showDeleteQuestionModal.value = true;
+}
+
+async function executeDeleteQuestion() {
+	if (!questionToDelete.value) return;
 	const result = await request(api.value.questionDelete, {
-		body: { action: "delQuestion", id: qId },
+		body: { action: "delQuestion", id: questionToDelete.value },
 	});
 	if (result.success) {
 		notify("Question deleted", "success");
@@ -243,6 +265,8 @@ async function deleteQuestion(qId) {
 	} else {
 		notify("Failed to delete question", "error");
 	}
+	showDeleteQuestionModal.value = false;
+	questionToDelete.value = null;
 }
 
 async function addQuestion(headerId) {
@@ -301,40 +325,45 @@ onMounted(async () => {
 	<LoadingOverlay v-if="isLoading || isUploading" />
 	<AppToast v-bind="toast" @update:visible="toast.visible = $event" />
 
-	<div class="questions-page">
-		<div class="page-top">
-			<div class="title-section">
-				<h2 class="page-title">
-					{{ type === "teacher" ? "Teacher" : "Student" }} Evaluation
-					Questions
-				</h2>
-				<p class="page-desc">
-					Manage the questions used in {{ type }} evaluations
-				</p>
+	<div class="animate-fade-up space-y-6">
+		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+			<div class="flex items-center gap-3">
+				<div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 shadow-sm">
+					<FileQuestion class="h-6 w-6" />
+				</div>
+				<div>
+					<h2 class="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+						{{ type === "teacher" ? "Teacher" : "Student" }} Evaluation Questions
+					</h2>
+					<p class="mt-1 text-sm text-slate-500">
+						Manage the questions used in {{ type }} evaluations
+					</p>
+				</div>
 			</div>
 
-			<div class="actions-section">
+			<div class="flex flex-wrap items-center gap-3">
 				<!-- Version selector controls -->
-				<div class="version-controls" v-if="versions.length > 0">
-					<span class="control-label">Version Set:</span>
-					<select v-model="selectedVersion" @change="onVersionChange" class="version-select">
-						<option v-for="ver in versions" :key="ver" :value="ver">
-							{{ ver }}
-						</option>
-					</select>
+				<div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-1 shadow-sm" v-if="versions.length > 0">
+					<div class="relative">
+						<select v-model="selectedVersion" @change="onVersionChange" class="appearance-none rounded-lg bg-slate-50 border-0 py-1.5 pl-3 pr-8 text-sm font-semibold text-slate-700 outline-none ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-indigo-600 cursor-pointer">
+							<option v-for="ver in versions" :key="ver" :value="ver">
+								{{ ver }}
+							</option>
+						</select>
+					</div>
 
-					<span v-if="selectedVersion === activeVersion" class="badge badge-success">
-						<span class="material-icons" style="font-size: 0.875rem; margin-right: 2px;">check_circle</span>
-						Active
-					</span>
-					<span v-else class="badge badge-warning">
-						<span class="material-icons" style="font-size: 0.875rem; margin-right: 2px;">info</span>
-						Inactive
-					</span>
+					<div class="flex items-center gap-1.5 px-2">
+						<span v-if="selectedVersion === activeVersion" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+							<CheckCircle2 class="h-3 w-3" /> Active
+						</span>
+						<span v-else class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+							<Info class="h-3 w-3" /> Inactive
+						</span>
+					</div>
 
 					<button
 						v-if="selectedVersion !== activeVersion && selectedVersion"
-						class="btn btn-secondary btn-sm"
+						class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors mr-1"
 						@click="setActiveVersion"
 					>
 						Set Active
@@ -342,37 +371,46 @@ onMounted(async () => {
 				</div>
 
 				<button
-					class="btn btn-outline"
+					class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
 					@click="showUploadModal = true"
 				>
-					<span class="material-icons" style="font-size: 1.125rem">upload</span>
+					<UploadCloud class="h-4 w-4 text-slate-500" />
 					Import
 				</button>
 				
 				<button
-					class="btn btn-primary"
+					class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
 					@click="showAddHeader = !showAddHeader"
 				>
-					<span class="material-icons" style="font-size: 1.125rem">add</span>
+					<Plus class="h-4 w-4" />
 					Add Section
 				</button>
 			</div>
 		</div>
 
 		<!-- Add Header -->
-		<Transition name="expand">
-			<div v-if="showAddHeader" class="add-header-bar card">
+		<Transition
+			enter-active-class="transition-all duration-300 ease-out"
+			enter-from-class="opacity-0 -translate-y-4"
+			enter-to-class="opacity-100 translate-y-0"
+			leave-active-class="transition-all duration-200 ease-in"
+			leave-from-class="opacity-100 translate-y-0"
+			leave-to-class="opacity-0 -translate-y-4"
+		>
+			<div v-if="showAddHeader" class="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
 				<input
 					v-model="newHeader"
 					type="text"
 					placeholder="New section name..."
+					class="block w-full rounded-lg border-0 py-2.5 px-4 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-indigo-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
 					@keyup.enter="addHeader"
 				/>
-				<button class="btn btn-primary btn-sm" @click="addHeader">
-					Add
+				<button class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700" @click="addHeader">
+					<Check class="h-4 w-4" />
+					Save
 				</button>
 				<button
-					class="btn btn-ghost btn-sm"
+					class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
 					@click="showAddHeader = false"
 				>
 					Cancel
@@ -381,671 +419,280 @@ onMounted(async () => {
 		</Transition>
 
 		<!-- Sections -->
-		<div
-			v-for="header in headers"
-			:key="header.header_id"
-			class="section card"
-		>
-			<div class="section-top">
-				<div class="section-title-area">
-					<h3 v-if="!header.editing">{{ header.header }}</h3>
-					<input
-						v-else
-						v-model="header.header"
-						type="text"
-						class="edit-input"
-						@keyup.enter="updateHeader(header)"
-					/>
-				</div>
-				<div class="section-actions">
-					<button
-						v-if="header.editing"
-						class="btn btn-primary btn-sm"
-						@click="updateHeader(header)"
-					>
-						Save
-					</button>
-					<button
-						class="icon-btn"
-						@click="header.editing = !header.editing"
-						:title="header.editing ? 'Cancel' : 'Edit section'"
-					>
-						<span class="material-icons">{{
-							header.editing ? "close" : "edit"
-						}}</span>
-					</button>
-					<button
-						class="icon-btn"
-						@click="header.addQ = !header.addQ"
-						title="Add question"
-					>
-						<span class="material-icons">add_circle_outline</span>
-					</button>
-					<button
-						class="icon-btn danger"
-						@click="deleteHeader(header.header_id)"
-						title="Delete section"
-					>
-						<span class="material-icons">delete_outline</span>
-					</button>
-				</div>
-			</div>
-
-			<!-- Add Question Bar -->
-			<div v-if="header.addQ" class="add-q-bar">
-				<input
-					v-model="newQuestion"
-					type="text"
-					placeholder="New question..."
-					@keyup.enter="addQuestion(header.header_id)"
-				/>
-				<button
-					class="btn btn-primary btn-sm"
-					@click="addQuestion(header.header_id)"
-				>
-					Add
-				</button>
-			</div>
-
-			<!-- Questions -->
-			<div class="q-list">
-				<div
-					v-for="(q, idx) in header.questions"
-					:key="q.question_id"
-					class="q-item"
-				>
-					<span class="q-num">{{ idx + 1 }}.</span>
-					<div class="q-content">
-						<p v-if="!q.editing">{{ q.question }}</p>
+		<div class="space-y-6">
+			<div
+				v-for="header in headers"
+				:key="header.header_id"
+				class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+			>
+				<div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+					<div class="flex-1 mr-4">
+						<h3 v-if="!header.editing" class="text-base font-bold text-slate-900">{{ header.header }}</h3>
 						<input
 							v-else
-							v-model="q.question"
+							v-model="header.header"
 							type="text"
-							class="edit-input"
-							@keyup.enter="updateQuestion(q)"
+							class="block w-full rounded-lg border-0 py-1.5 px-3 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							@keyup.enter="updateHeader(header)"
 						/>
 					</div>
-					<div class="q-actions">
+					<div class="flex items-center gap-1.5 shrink-0">
 						<button
-							v-if="q.editing"
-							class="btn btn-primary btn-sm"
-							@click="updateQuestion(q)"
+							v-if="header.editing"
+							class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+							@click="updateHeader(header)"
 						>
+							<Save class="h-3.5 w-3.5" />
 							Save
 						</button>
 						<button
-							class="icon-btn"
-							@click="q.editing = !q.editing"
+							class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+							@click="header.editing = !header.editing"
+							:title="header.editing ? 'Cancel' : 'Edit section'"
 						>
-							<span class="material-icons">{{
-								q.editing ? "close" : "edit"
-							}}</span>
+							<X v-if="header.editing" class="h-4 w-4" />
+							<Pencil v-else class="h-4 w-4" />
 						</button>
 						<button
-							class="icon-btn danger"
-							@click="deleteQuestion(q.question_id)"
+							class="flex h-8 w-8 items-center justify-center rounded-lg text-indigo-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+							@click="header.addQ = !header.addQ"
+							title="Add question"
 						>
-							<span class="material-icons">delete_outline</span>
+							<PlusCircle class="h-4 w-4" />
+						</button>
+						<button
+							class="flex h-8 w-8 items-center justify-center rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+							@click="deleteHeader(header.header_id)"
+							title="Delete section"
+						>
+							<Trash2 class="h-4 w-4" />
 						</button>
 					</div>
 				</div>
-				<p
-					v-if="!header.questions || header.questions.length === 0"
-					class="no-questions"
-				>
-					No questions in this section
+
+				<!-- Add Question Bar -->
+				<div v-if="header.addQ" class="border-b border-indigo-100 bg-indigo-50/30 p-4">
+					<div class="flex items-center gap-3 max-w-3xl">
+						<input
+							v-model="newQuestion"
+							type="text"
+							placeholder="Type new question here..."
+							class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-indigo-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+							@keyup.enter="addQuestion(header.header_id)"
+						/>
+						<button
+							class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+							@click="addQuestion(header.header_id)"
+						>
+							<Check class="h-4 w-4" />
+							Add Question
+						</button>
+					</div>
+				</div>
+
+				<!-- Questions -->
+				<div class="divide-y divide-slate-100">
+					<div
+						v-for="(q, idx) in header.questions"
+						:key="q.question_id"
+						class="flex items-start gap-4 p-4 hover:bg-slate-50/50 transition-colors"
+					>
+						<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 mt-0.5">
+							{{ idx + 1 }}
+						</span>
+						<div class="flex-1 pt-0.5 min-w-0">
+							<p v-if="!q.editing" class="text-sm font-medium text-slate-700">{{ q.question }}</p>
+							<input
+								v-else
+								v-model="q.question"
+								type="text"
+								class="block w-full rounded-lg border-0 py-1.5 px-3 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+								@keyup.enter="updateQuestion(q)"
+							/>
+						</div>
+						<div class="flex items-center gap-1 shrink-0">
+							<button
+								v-if="q.editing"
+								class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors mr-2"
+								@click="updateQuestion(q)"
+							>
+								Save
+							</button>
+							<button
+								class="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+								@click="q.editing = !q.editing"
+							>
+								<X v-if="q.editing" class="h-3.5 w-3.5" />
+								<Pencil v-else class="h-3.5 w-3.5" />
+							</button>
+							<button
+								class="flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-rose-50 hover:text-rose-500 transition-colors"
+								@click="deleteQuestion(q.question_id)"
+							>
+								<Trash2 class="h-3.5 w-3.5" />
+							</button>
+						</div>
+					</div>
+					
+					<div
+						v-if="!header.questions || header.questions.length === 0"
+						class="p-8 text-center"
+					>
+						<p class="text-sm text-slate-400">No questions in this section</p>
+					</div>
+				</div>
+			</div>
+
+			<div v-if="headers.length === 0 && !isLoading" class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center">
+				<div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-400">
+					<FileQuestion class="h-7 w-7" />
+				</div>
+				<h3 class="text-sm font-bold text-slate-900">No question sections yet</h3>
+				<p class="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+					Click "Add Section" to manually create one, or "Import" to upload a .docx questionnaire.
 				</p>
 			</div>
 		</div>
 
-		<div v-if="headers.length === 0" class="empty-state">
-			<span class="material-icons">quiz</span>
-			<p>No question sections yet. Click "Add Section" or "Import" to get started.</p>
-		</div>
-
-		<!-- Import Modal -->
-		<Transition name="fade">
-			<div v-if="showUploadModal" class="modal-backdrop" @click.self="showUploadModal = false">
-				<Transition name="modal">
-					<div class="modal-card">
-						<div class="modal-header">
-							<span class="material-icons modal-icon" style="color: var(--color-primary)">
-								cloud_upload
-							</span>
-							<h2>Import Questionnaire (.docx)</h2>
-							<p>
-								Select a Microsoft Word (.docx) file containing the new questionnaire to automatically parse and import it.
-							</p>
-						</div>
-
-						<div class="modal-body form-layout">
-							<div class="form-group">
-								<label for="version-name">Version Identifier</label>
-								<input
-									id="version-name"
-									v-model="uploadVersionName"
-									type="text"
-									placeholder="e.g. v2026, v2025_new"
-									class="modal-input"
-								/>
-								<span class="input-tip">Must be a unique name to identify this questionnaire set.</span>
+		<!-- Import Modal (Teleport to Body) -->
+		<Teleport to="body">
+			<Transition
+				enter-active-class="transition duration-200 ease-out"
+				enter-from-class="opacity-0"
+				enter-to-class="opacity-100"
+				leave-active-class="transition duration-150 ease-in"
+				leave-from-class="opacity-100"
+				leave-to-class="opacity-0"
+			>
+				<div
+					v-if="showUploadModal"
+					class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 sm:p-6"
+					@click.self="showUploadModal = false"
+				>
+					<Transition
+						enter-active-class="transition duration-200 ease-out"
+						enter-from-class="opacity-0 scale-95 translate-y-2"
+						enter-to-class="opacity-100 scale-100 translate-y-0"
+						leave-active-class="transition duration-150 ease-in"
+						leave-from-class="opacity-100 scale-100 translate-y-0"
+						leave-to-class="opacity-0 scale-95 translate-y-2"
+					>
+						<div v-if="showUploadModal" class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+							<!-- Modal Header -->
+							<div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+								<div class="flex items-center gap-3">
+									<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+										<UploadCloud class="h-5 w-5" />
+									</div>
+									<div>
+										<h3 class="text-base font-bold text-slate-900">Import Questionnaire</h3>
+										<p class="text-xs text-slate-500">Upload a Microsoft Word (.docx) file</p>
+									</div>
+								</div>
+								<button
+									@click="showUploadModal = false"
+									:disabled="isUploading"
+									class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+								>
+									<X class="h-5 w-5" />
+								</button>
 							</div>
 
-							<div class="form-group">
-								<label>Upload File</label>
-								<div
-									class="drop-zone"
-									:class="{ active: dragActive, 'has-file': uploadFile }"
-									@dragover.prevent="dragActive = true"
-									@dragleave.prevent="dragActive = false"
-									@drop.prevent="onDrop"
-								>
-									<span class="material-icons drop-icon">{{
-										uploadFile ? "description" : "article"
-									}}</span>
-									<p v-if="!uploadFile" class="drop-text">
-										Drag & drop a .docx file here, or click to browse
-									</p>
-									<p v-else class="drop-text file-name">{{ uploadFile.name }}</p>
-									<span v-if="uploadFile" class="file-size"
-										>{{ (uploadFile.size / 1024).toFixed(1) }} KB</span
-									>
-
+							<!-- Modal Body -->
+							<div class="p-6 space-y-5">
+								<div>
+									<label class="mb-1.5 block text-sm font-semibold text-slate-700">Version Identifier</label>
 									<input
-										type="file"
-										accept=".docx"
-										class="file-input"
-										@change="onFileChange"
+										v-model="uploadVersionName"
+										type="text"
+										placeholder="e.g. v2026, v2025_new"
+										class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
 									/>
+									<p class="mt-1.5 text-xs text-slate-500">Must be a unique name to identify this questionnaire set.</p>
+								</div>
+
+								<div>
+									<label class="mb-1.5 block text-sm font-semibold text-slate-700">Upload File</label>
+									<div
+										class="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer"
+										:class="{
+											'border-indigo-400 bg-indigo-50': dragActive,
+											'border-emerald-400 bg-emerald-50': uploadFile && !dragActive,
+											'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-slate-100': !dragActive && !uploadFile
+										}"
+										@dragover.prevent="dragActive = true"
+										@dragleave.prevent="dragActive = false"
+										@drop.prevent="onDrop"
+									>
+										<FileText v-if="uploadFile" class="h-8 w-8 text-emerald-500 mb-3" />
+										<FileText v-else class="h-8 w-8 text-indigo-500 mb-3" />
+										
+										<div v-if="!uploadFile">
+											<p class="text-sm font-semibold text-slate-700">Drag & drop a .docx file here</p>
+											<p class="text-xs text-slate-500 mt-1">or click to browse</p>
+										</div>
+										<div v-else>
+											<p class="text-sm font-semibold text-slate-900">{{ uploadFile.name }}</p>
+											<p class="text-xs text-slate-500 mt-1">{{ (uploadFile.size / 1024).toFixed(1) }} KB</p>
+										</div>
+
+										<input
+											type="file"
+											accept=".docx"
+											class="absolute inset-0 cursor-pointer opacity-0"
+											@change="onFileChange"
+										/>
+									</div>
 								</div>
 							</div>
-						</div>
 
-						<div class="modal-actions">
-							<button class="btn btn-ghost" @click="showUploadModal = false" :disabled="isUploading">
-								Cancel
-							</button>
-							<button class="btn btn-primary" @click="handleUpload" :disabled="isUploading || !uploadFile || !uploadVersionName.trim()">
-								<span v-if="isUploading" class="material-icons spin">sync</span>
-								<span v-else class="material-icons">upload</span>
-								Import
-							</button>
+							<!-- Modal Actions -->
+							<div class="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/50 p-6 sm:flex-row sm:justify-end">
+								<button
+									@click="showUploadModal = false"
+									:disabled="isUploading"
+									class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto disabled:opacity-50"
+								>
+									Cancel
+								</button>
+								<button
+									@click="handleUpload"
+									:disabled="isUploading || !uploadFile || !uploadVersionName.trim()"
+									class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									<Loader2 v-if="isUploading" class="h-4 w-4 animate-spin" />
+									<UploadCloud v-else class="h-4 w-4" />
+									{{ isUploading ? 'Importing...' : 'Import Questionnaire' }}
+								</button>
+							</div>
 						</div>
-					</div>
-				</Transition>
-			</div>
-		</Transition>
+					</Transition>
+				</div>
+			</Transition>
+		</Teleport>
+
+		<!-- Delete Header Confirm Modal -->
+		<ConfirmModal
+			v-model:visible="showDeleteHeaderModal"
+			title="Delete Section"
+			message="Delete this entire section and all its questions? This action cannot be undone."
+			confirmText="Delete Section"
+			cancelText="Cancel"
+			:danger="true"
+			icon="trash"
+			@confirm="executeDeleteHeader"
+		/>
+
+		<!-- Delete Question Confirm Modal -->
+		<ConfirmModal
+			v-model:visible="showDeleteQuestionModal"
+			title="Delete Question"
+			message="Are you sure you want to delete this question? This action cannot be undone."
+			confirmText="Delete Question"
+			cancelText="Cancel"
+			:danger="true"
+			icon="trash"
+			@confirm="executeDeleteQuestion"
+		/>
 	</div>
 </template>
-
-<style scoped>
-.questions-page {
-	animation: fadeIn 0.3s ease;
-}
-
-.page-top {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: var(--space-6);
-	gap: var(--space-4);
-	flex-wrap: wrap;
-}
-
-.page-title {
-	font-size: 1.25rem;
-	margin-bottom: var(--space-1);
-}
-
-.page-desc {
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
-}
-
-.actions-section {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-	flex-wrap: wrap;
-}
-
-.version-controls {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-}
-
-.control-label {
-	font-size: 0.8125rem;
-	font-weight: 600;
-	color: var(--color-text-muted);
-	margin: 0;
-	white-space: nowrap;
-}
-
-.version-select {
-	font-family: var(--font-sans);
-	font-size: 0.875rem;
-	font-weight: 500;
-	padding: 0.375rem 2rem 0.375rem 0.75rem;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	background: var(--color-bg) url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") no-repeat right 0.5rem center/1.25rem;
-	-webkit-appearance: none;
-	-moz-appearance: none;
-	appearance: none;
-	cursor: pointer;
-	outline: none;
-	transition: all var(--transition-fast);
-	min-width: 100px;
-}
-
-.version-select:hover {
-	border-color: var(--color-border-strong);
-}
-
-.version-select:focus {
-	border-color: var(--color-primary);
-	box-shadow: 0 0 0 2px var(--color-primary-light);
-}
-
-.badge {
-	font-size: 0.75rem;
-	padding: 0.25rem 0.625rem;
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
-	border-radius: var(--radius-full);
-	font-weight: 600;
-	line-height: 1;
-}
-
-.badge-success {
-	background: var(--color-success-light);
-	color: var(--color-success);
-}
-
-.badge-warning {
-	background: var(--color-warning-light);
-	color: var(--color-warning);
-}
-
-.btn {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-}
-
-.btn-outline {
-	background: transparent;
-	color: var(--color-primary);
-	border: 1px solid var(--color-primary);
-}
-.btn-outline:hover:not(:disabled) {
-	background: var(--color-primary-50);
-	color: var(--color-primary-hover);
-	border-color: var(--color-primary-hover);
-}
-
-/* Modal backdrop and card styling */
-.modal-backdrop {
-	position: fixed;
-	inset: 0;
-	background: rgba(15, 23, 42, 0.3);
-	backdrop-filter: blur(8px);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 9999;
-	padding: var(--space-4);
-}
-
-.modal-card {
-	background: var(--color-bg);
-	border: 1px solid #cbd5e1;
-	border-radius: var(--radius-2xl);
-	width: 100%;
-	max-width: 480px;
-	padding: var(--space-6);
-	position: relative;
-	box-shadow: var(--shadow-xl);
-}
-
-.modal-header {
-	margin-bottom: var(--space-4);
-	text-align: center;
-}
-
-.modal-icon {
-	font-size: 2.5rem;
-	margin-bottom: var(--space-2);
-}
-
-.modal-header h2 {
-	margin-bottom: var(--space-1);
-	font-size: 1.25rem;
-	font-weight: 700;
-	color: var(--color-text);
-}
-
-.modal-header p {
-	font-size: 0.875rem;
-	color: var(--color-text-muted);
-	line-height: 1.5;
-}
-
-.modal-body {
-	margin-bottom: var(--space-5);
-}
-
-.modal-input {
-	padding: var(--space-2) var(--space-3);
-	font-size: 0.9375rem;
-	border: 1px solid var(--color-border-strong);
-	border-radius: var(--radius-md);
-}
-
-.input-tip {
-	font-size: 0.75rem;
-	color: var(--color-text-muted);
-	margin-top: 2px;
-}
-
-.drop-zone {
-	position: relative;
-	border: 2px dashed var(--color-border);
-	border-radius: var(--radius-lg);
-	padding: var(--space-6) var(--space-4);
-	text-align: center;
-	cursor: pointer;
-	transition: all var(--transition-base);
-}
-
-.drop-zone:hover,
-.drop-zone.active {
-	border-color: var(--color-primary);
-	background: var(--color-primary-50);
-}
-
-.drop-zone.has-file {
-	border-color: var(--color-success);
-	background: var(--color-success-light);
-}
-
-.drop-icon {
-	font-size: 2.5rem;
-	color: var(--color-text-muted);
-	margin-bottom: var(--space-2);
-	display: block;
-}
-
-.has-file .drop-icon {
-	color: var(--color-success);
-}
-
-.drop-text {
-	color: var(--color-text-muted);
-	font-size: 0.8125rem;
-}
-
-.file-name {
-	font-weight: 600;
-	color: var(--color-text);
-}
-
-.file-size {
-	font-size: 0.75rem;
-	color: var(--color-text-muted);
-}
-
-.file-input {
-	position: absolute;
-	inset: 0;
-	opacity: 0;
-	cursor: pointer;
-}
-
-.modal-actions {
-	display: flex;
-	gap: var(--space-3);
-	justify-content: flex-end;
-}
-
-.modal-actions .btn {
-	min-width: 100px;
-}
-
-.spin {
-	animation: spin 1s linear infinite;
-}
-
-/* Transitions */
-.fade-enter-active,
-.fade-leave-active {
-	transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-	opacity: 0;
-}
-
-.modal-enter-active {
-	animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.modal-leave-active {
-	animation: slideUp 0.2s ease reverse;
-}
-
-@keyframes slideUp {
-	from {
-		opacity: 0;
-		transform: translateY(20px) scale(0.95);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-	}
-}
-
-/* Add header bar */
-.add-header-bar {
-	display: flex;
-	gap: var(--space-3);
-	align-items: center;
-	padding: var(--space-4) var(--space-5);
-	margin-bottom: var(--space-5);
-	background: rgba(255, 255, 255, 0.7);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
-	animation: slideDown var(--transition-base);
-}
-
-.add-header-bar input {
-	flex: 1;
-}
-
-/* Section */
-.section {
-	padding: var(--space-5);
-	margin-bottom: var(--space-5);
-}
-
-.section-top {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-3);
-	margin-bottom: var(--space-4);
-	flex-wrap: wrap;
-}
-
-.section-title-area {
-	flex: 1;
-	min-width: 200px;
-}
-
-.section-title-area h3 {
-	font-size: 1.0625rem;
-	margin: 0;
-}
-
-.section-actions {
-	display: flex;
-	gap: var(--space-2);
-	align-items: center;
-}
-
-.edit-input {
-	font-size: 0.9375rem;
-	padding: var(--space-2) var(--space-4);
-	width: 100%;
-	border: 1px solid var(--color-primary);
-	border-radius: var(--radius-md);
-	background: #ffffff;
-	box-shadow: 0 0 0 3px var(--color-primary-light);
-	outline: none;
-	transition: all var(--transition-fast);
-}
-
-.edit-input:focus {
-	border-color: var(--color-primary-hover);
-	box-shadow: 0 0 0 4px var(--color-primary-light);
-}
-
-.icon-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 36px;
-	height: 36px;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-md);
-	background: var(--color-bg);
-	color: var(--color-text-secondary);
-	cursor: pointer;
-	transition: all var(--transition-base);
-}
-
-.icon-btn:hover {
-	background: var(--color-bg-subtle);
-	color: var(--color-text);
-}
-
-.icon-btn.danger:hover {
-	background: #fee2e2;
-	color: var(--color-error);
-	border-color: #fca5a5;
-}
-
-.icon-btn .material-icons {
-	font-size: 1.125rem;
-}
-
-/* Add Q bar */
-.add-q-bar {
-	display: flex;
-	gap: var(--space-3);
-	align-items: center;
-	padding: var(--space-4);
-	background: var(--color-bg-page);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-lg);
-	margin-bottom: var(--space-4);
-	box-shadow: var(--shadow-xs);
-	animation: slideDown var(--transition-base);
-}
-
-.add-q-bar input {
-	flex: 1;
-}
-
-/* Questions list */
-.q-list {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
-}
-
-.q-item {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-	padding: var(--space-3);
-	border-radius: var(--radius-md);
-	transition: background var(--transition-base);
-}
-
-.q-item:hover {
-	background: var(--color-bg-subtle);
-}
-
-.q-num {
-	font-weight: 600;
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
-	min-width: 24px;
-}
-
-.q-content {
-	flex: 1;
-}
-
-.q-content p {
-	margin: 0;
-	font-size: 0.9375rem;
-}
-
-.q-actions {
-	display: flex;
-	gap: var(--space-1);
-	opacity: 0;
-	transition: opacity var(--transition-base);
-}
-
-.q-item:hover .q-actions {
-	opacity: 1;
-}
-
-.no-questions {
-	color: var(--color-text-muted);
-	font-size: 0.875rem;
-	font-style: italic;
-	padding: var(--space-3);
-}
-
-/* Empty */
-.empty-state {
-	text-align: center;
-	padding: var(--space-12);
-	color: var(--color-text-muted);
-}
-
-.empty-state .material-icons {
-	font-size: 3rem;
-	margin-bottom: var(--space-3);
-	color: var(--color-bg-muted);
-}
-
-@media (max-width: 768px) {
-	.page-top {
-		flex-direction: column;
-		align-items: flex-start;
-	}
-	.actions-section {
-		width: 100%;
-		justify-content: space-between;
-	}
-	.version-controls {
-		width: 100%;
-		justify-content: space-between;
-	}
-	.section-top {
-		flex-direction: column;
-		align-items: flex-start;
-	}
-	.q-actions {
-		opacity: 1;
-	}
-}
-</style>

@@ -3,7 +3,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useApi } from "../composables/useApi";
 import Pagination from "./Pagination.vue";
 import ConfirmModal from "./ConfirmModal.vue";
+import LoadingOverlay from "./LoadingOverlay.vue";
 import API from "../utils/api";
+import {
+	UserPlus, Pencil, Archive, Search, X, User, BookOpen,
+	Lock, Eye, EyeOff, Users, Save, Mail
+} from "@lucide/vue";
 
 const props = defineProps({
 	currentTeacherId: {
@@ -66,6 +71,7 @@ async function createTeacher() {
 	if (result.success) {
 		notify("Teacher created successfully", "success");
 		teacherForm.value = { fn: "", ln: "", email: "", id: "", sub: "", qrt: "", yr: "", ps: "", cpas: "" };
+		showCreateForm.value = false;
 		fetchTeachers();
 	} else {
 		notify(result.message || "Failed to create teacher", "error");
@@ -152,7 +158,7 @@ watch([showCreateForm, isEditing], ([newCreate, newEdit]) => {
 	if (newCreate || newEdit) {
 		document.body.style.overflow = "hidden";
 	} else {
-		const activeBackdrops = document.querySelectorAll(".modal-backdrop");
+		const activeBackdrops = document.querySelectorAll(".ma-modal-backdrop");
 		if (activeBackdrops.length <= 1) {
 			document.body.style.overflow = "";
 		}
@@ -160,10 +166,7 @@ watch([showCreateForm, isEditing], ([newCreate, newEdit]) => {
 });
 
 onUnmounted(() => {
-	const activeBackdrops = document.querySelectorAll(".modal-backdrop");
-	if (activeBackdrops.length === 0) {
-		document.body.style.overflow = "";
-	}
+	document.body.style.overflow = "";
 });
 
 onMounted(() => {
@@ -181,652 +184,477 @@ onMounted(() => {
 		message="Are you sure you want to archive this teacher? Their account will be deactivated and moved to the Archived Teachers list, but their data will be preserved."
 		confirmText="Archive"
 		cancelText="Cancel"
-		confirmBtnClass="btn-danger"
+		:danger="true"
 		icon="archive"
-		iconColor="var(--color-danger)"
 		@confirm="confirmDelete"
 	/>
 
-	<div class="manage-section">
-		<!-- Unified List View -->
-		<div>
-			<div class="manage-toolbar">
-				<div class="manage-search-wrap">
-					<span class="material-icons-outlined search-icon">search</span>
-					<input v-model="manageSearch" type="text" placeholder="Search teachers by name, subject, or email..." class="manage-search-input" />
-					<span v-if="manageSearch" class="clear-search" @click="manageSearch = ''">
-						<span class="material-icons-outlined">close</span>
-					</span>
+	<div class="space-y-6 animate-fade-up">
+		<!-- Toolbar -->
+		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+			<div class="relative flex-1 max-w-lg">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+					<Search class="h-5 w-5 text-slate-400" />
 				</div>
-				<button class="btn btn-primary btn-add-user" @click="showCreateForm = true">
-					<span class="material-icons">person_add</span> Add User
+				<input
+					v-model="manageSearch"
+					type="text"
+					placeholder="Search by name, subject, or email..."
+					class="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+				/>
+				<button
+					v-if="manageSearch"
+					@click="manageSearch = ''"
+					class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
+				>
+					<X class="h-4 w-4" />
 				</button>
 			</div>
+			<button
+				@click="showCreateForm = true"
+				class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 whitespace-nowrap"
+			>
+				<UserPlus class="h-4 w-4" />
+				Add Teacher
+			</button>
+		</div>
 
-			<div class="card-grid">
-				<div v-for="teacher in filteredTeachers" :key="teacher.id" class="admin-teacher-card">
-					<div class="card-inner">
-						<div class="card-header">
-							<div class="profile-section">
-								<div class="person-icon icon-pending">
-									<span class="material-icons-outlined">person</span>
+		<!-- Card Grid -->
+		<div v-if="filteredTeachers.length > 0" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div
+				v-for="teacher in filteredTeachers"
+				:key="teacher.id"
+				class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+			>
+				<!-- Card Header -->
+				<div class="flex items-start justify-between gap-3">
+					<div class="flex items-center gap-3 min-w-0">
+						<div class="flex h-12 w-12 flex-none items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-100">
+							<User class="h-6 w-6" />
+						</div>
+						<div class="min-w-0">
+							<h3
+								class="truncate text-base font-bold text-slate-900"
+								:title="teacher.firstname + ' ' + teacher.lastname"
+							>
+								{{ teacher.firstname }} {{ teacher.lastname }}
+							</h3>
+							<p class="truncate text-sm font-medium text-slate-500" :title="teacher.subject">
+								{{ teacher.subject || "No subject assigned" }}
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Card Meta -->
+				<div class="mt-4 flex flex-wrap gap-2">
+					<div class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+						<span class="font-bold text-slate-400">ID:</span>
+						{{ teacher.teacher_id || teacher.id }}
+					</div>
+					<div v-if="teacher.quarter && teacher.year" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+						<span class="font-bold text-slate-400">Term:</span>
+						Q{{ teacher.quarter }} {{ teacher.year }}
+					</div>
+					<div v-if="teacher.email" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 min-w-0 max-w-full">
+						<Mail class="h-3 w-3 text-slate-400 flex-none" />
+						<span class="truncate">{{ teacher.email }}</span>
+					</div>
+				</div>
+
+				<!-- Card Actions -->
+				<div class="mt-5 flex gap-2">
+					<button
+						@click="startEdit(teacher)"
+						class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-100 hover:border-slate-300"
+					>
+						<Pencil class="h-4 w-4" />
+						Edit
+					</button>
+					<button
+						@click="deleteTeacher(teacher.id)"
+						:disabled="teacher.id === currentTeacherId"
+						:title="teacher.id === currentTeacherId ? 'You cannot archive your own account' : 'Archive User'"
+						class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition-all hover:bg-rose-100 hover:border-rose-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+					>
+						<Archive class="h-4 w-4" />
+						Archive
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Empty State -->
+		<div v-else class="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 px-4 text-center">
+			<div class="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+				<Users class="h-8 w-8" />
+			</div>
+			<h3 class="text-lg font-bold text-slate-900 mb-1">
+				{{ manageSearch ? "No results found" : "No teachers available" }}
+			</h3>
+			<p class="text-sm text-slate-500 max-w-sm">
+				{{ manageSearch ? "Try adjusting your search terms." : "Add a new teacher to get started." }}
+			</p>
+		</div>
+
+		<Pagination
+			v-if="filteredTeachers.length > 0 && !manageSearch"
+			:current-page="currentPage"
+			:total-pages="totalPages"
+			:total-items="teacherCount"
+			:per-page="perPage"
+			@page-change="currentPage = $event"
+		/>
+	</div>
+
+	<!-- Create Form Modal -->
+	<Teleport to="body">
+		<Transition
+			enter-active-class="transition duration-200 ease-out"
+			enter-from-class="opacity-0"
+			enter-to-class="opacity-100"
+			leave-active-class="transition duration-150 ease-in"
+			leave-from-class="opacity-100"
+			leave-to-class="opacity-0"
+		>
+			<div
+				v-if="showCreateForm"
+				class="ma-modal-backdrop fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6"
+			>
+				<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showCreateForm = false"></div>
+				<div class="relative my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+					<!-- Modal Header -->
+					<div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+						<div class="flex items-center gap-3">
+							<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+								<UserPlus class="h-5 w-5" />
+							</div>
+							<div>
+								<h3 class="text-base font-bold text-slate-900">Add Teacher</h3>
+								<p class="text-xs text-slate-500">Create a new faculty account</p>
+							</div>
+						</div>
+						<button
+							@click="showCreateForm = false"
+							class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+						>
+							<X class="h-5 w-5" />
+						</button>
+					</div>
+
+					<!-- Modal Body -->
+					<form @submit.prevent="createTeacher" class="p-6">
+						<div class="space-y-6">
+							<!-- Personal Info -->
+							<div>
+								<div class="mb-4 flex items-center gap-2">
+									<User class="h-4 w-4 text-indigo-500" />
+									<h4 class="text-sm font-bold uppercase tracking-wide text-slate-700">Personal Info</h4>
 								</div>
-								<div class="teacher-info">
-									<h3>{{ teacher.firstname }} {{ teacher.lastname }}</h3>
-									<p v-if="teacher.subject" class="subject">{{ teacher.subject }}</p>
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">First Name</label>
+										<input
+											v-model="teacherForm.fn"
+											type="text"
+											placeholder="First name"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Last Name</label>
+										<input
+											v-model="teacherForm.ln"
+											type="text"
+											placeholder="Last name"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Email</label>
+										<input
+											v-model="teacherForm.email"
+											type="email"
+											placeholder="Email address"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Teacher ID</label>
+										<input
+											v-model="teacherForm.id"
+											type="number"
+											placeholder="Teacher ID"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+								</div>
+							</div>
+
+							<!-- Assignment -->
+							<div>
+								<div class="mb-4 flex items-center gap-2">
+									<BookOpen class="h-4 w-4 text-indigo-500" />
+									<h4 class="text-sm font-bold uppercase tracking-wide text-slate-700">Assignment</h4>
+								</div>
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Subject</label>
+										<select
+											v-model="teacherForm.sub"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										>
+											<option value="" disabled>Select subject</option>
+											<option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.subjects }}</option>
+										</select>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Quarter</label>
+										<select
+											v-model="teacherForm.qrt"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										>
+											<option value="" disabled>Select</option>
+											<option value="1">Q1</option>
+											<option value="2">Q2</option>
+											<option value="3">Q3</option>
+											<option value="4">Q4</option>
+										</select>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Year</label>
+										<input
+											v-model="teacherForm.yr"
+											type="number"
+											placeholder="Year"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+								</div>
+							</div>
+
+							<!-- Security -->
+							<div>
+								<div class="mb-4 flex items-center gap-2">
+									<Lock class="h-4 w-4 text-indigo-500" />
+									<h4 class="text-sm font-bold uppercase tracking-wide text-slate-700">Security</h4>
+								</div>
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
+										<div class="relative">
+											<input
+												v-model="teacherForm.ps"
+												:type="showPassword ? 'text' : 'password'"
+												placeholder="Password"
+												minlength="8"
+												required
+												class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+											/>
+											<button
+												type="button"
+												@click="showPassword = !showPassword"
+												class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition-colors hover:text-slate-600"
+												tabindex="-1"
+											>
+												<EyeOff v-if="showPassword" class="h-4 w-4" />
+												<Eye v-else class="h-4 w-4" />
+											</button>
+										</div>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Confirm Password</label>
+										<input
+											v-model="teacherForm.cpas"
+											type="password"
+											placeholder="Confirm password"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
 								</div>
 							</div>
 						</div>
-						<div class="card-meta">
-							<span v-if="teacher.quarter" class="meta-tag">Q{{ teacher.quarter }} {{ teacher.year }}</span>
-						</div>
-						<div class="card-footer card-actions-dual">
-							<button class="btn-card-action" @click="startEdit(teacher)">
-								<span class="material-icons-outlined btn-icon">edit</span> Edit User
+
+						<!-- Actions -->
+						<div class="mt-6 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+							<button
+								type="button"
+								@click="showCreateForm = false"
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+							>
+								Cancel
 							</button>
 							<button
-								class="btn-card-action btn-card-danger"
-								@click="deleteTeacher(teacher.id)"
-								:disabled="teacher.id === currentTeacherId"
-								:title="teacher.id === currentTeacherId ? 'You cannot archive your own account' : 'Archive User'"
-								:class="{ 'action-disabled': teacher.id === currentTeacherId }"
+								type="submit"
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
 							>
-								<span class="material-icons-outlined btn-icon">archive</span> Archive User
+								<UserPlus class="h-4 w-4" />
+								Create Teacher
 							</button>
 						</div>
-					</div>
-				</div>
-				<div v-if="filteredTeachers.length === 0" class="empty-state">
-					<span class="material-icons">person_search</span>
-					<p>{{ manageSearch ? 'No teachers match your search' : 'No teachers available' }}</p>
+					</form>
 				</div>
 			</div>
-			<Pagination
-				:current-page="currentPage"
-				:total-pages="totalPages"
-				:total-items="teacherCount"
-				:per-page="perPage"
-				@page-change="currentPage = $event"
-			/>
-		</div>
+		</Transition>
+	</Teleport>
 
-		<!-- Create Form Modal -->
-		<Transition name="fade">
-		<div v-if="showCreateForm" class="modal-backdrop" @click.self="showCreateForm = false">
-		<div class="form-card card modal-panel">
-			<div class="form-header">
-				<h3 class="form-title">
-					<span class="material-icons">person_add</span>
-					Add Teacher
-				</h3>
-				<button class="btn btn-ghost btn-sm" @click="showCreateForm = false">Cancel</button>
-			</div>
-			<form @submit.prevent="createTeacher" class="form-layout">
-				<div class="form-section">
-					<div class="form-section-header">
-						<span class="material-icons">badge</span>
-						<h4>Personal Info</h4>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>First Name</label>
-							<input v-model="teacherForm.fn" type="text" placeholder="First name" required />
-						</div>
-						<div class="form-group">
-							<label>Last Name</label>
-							<input v-model="teacherForm.ln" type="text" placeholder="Last name" required />
-						</div>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>Email</label>
-							<input v-model="teacherForm.email" type="email" placeholder="Email" required />
-						</div>
-						<div class="form-group">
-							<label>ID</label>
-							<input v-model="teacherForm.id" type="number" placeholder="Teacher ID" required />
-						</div>
-					</div>
-				</div>
-
-				<div class="form-section">
-					<div class="form-section-header">
-						<span class="material-icons">school</span>
-						<h4>Assignment</h4>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>Subject</label>
-							<select v-model="teacherForm.sub" required>
-								<option value="" disabled>Select subject</option>
-								<option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.subjects }}</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<label>Quarter</label>
-							<select v-model="teacherForm.qrt" required>
-								<option value="" disabled>Select</option>
-								<option value="1">Q1</option>
-								<option value="2">Q2</option>
-								<option value="3">Q3</option>
-								<option value="4">Q4</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<label>Year</label>
-							<input v-model="teacherForm.yr" type="number" placeholder="Year" required />
-						</div>
-					</div>
-				</div>
-
-				<div class="form-section">
-					<div class="form-section-header">
-						<span class="material-icons">lock</span>
-						<h4>Security</h4>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>Password</label>
-							<div class="password-wrap">
-								<input
-									v-model="teacherForm.ps"
-									:type="showPassword ? 'text' : 'password'"
-									placeholder="Password"
-									minlength="8"
-									required
-								/>
-								<button type="button" class="toggle-pw" @click="showPassword = !showPassword" tabindex="-1">
-									<span class="material-icons-outlined">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
-								</button>
+	<!-- Edit Form Modal -->
+	<Teleport to="body">
+		<Transition
+			enter-active-class="transition duration-200 ease-out"
+			enter-from-class="opacity-0"
+			enter-to-class="opacity-100"
+			leave-active-class="transition duration-150 ease-in"
+			leave-from-class="opacity-100"
+			leave-to-class="opacity-0"
+		>
+			<div
+				v-if="isEditing"
+				class="ma-modal-backdrop fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6"
+			>
+				<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="cancelEdit"></div>
+				<div class="relative my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+					<!-- Modal Header -->
+					<div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+						<div class="flex items-center gap-3">
+							<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+								<Pencil class="h-5 w-5" />
+							</div>
+							<div>
+								<h3 class="text-base font-bold text-slate-900">Edit Teacher</h3>
+								<p class="text-xs text-slate-500">Update faculty account details</p>
 							</div>
 						</div>
-						<div class="form-group">
-							<label>Confirm Password</label>
-							<input v-model="teacherForm.cpas" type="password" placeholder="Confirm password" required />
-						</div>
+						<button
+							@click="cancelEdit"
+							class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+						>
+							<X class="h-5 w-5" />
+						</button>
 					</div>
-				</div>
 
-				<div class="form-actions">
-					<button type="submit" class="btn btn-primary">
-						<span class="material-icons" style="font-size: 1.125rem">person_add</span>
-						Create Teacher
-					</button>
-					<button type="button" class="btn btn-ghost" @click="showCreateForm = false">Cancel</button>
-				</div>
-			</form>
-		</div>
-		</div>
-		</Transition>
+					<!-- Modal Body -->
+					<form @submit.prevent="saveEdit" class="p-6">
+						<div class="space-y-6">
+							<!-- Personal Info -->
+							<div>
+								<div class="mb-4 flex items-center gap-2">
+									<User class="h-4 w-4 text-indigo-500" />
+									<h4 class="text-sm font-bold uppercase tracking-wide text-slate-700">Personal Info</h4>
+								</div>
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">First Name</label>
+										<input
+											v-model="editForm.fn"
+											type="text"
+											required
+											disabled
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Last Name</label>
+										<input
+											v-model="editForm.ln"
+											type="text"
+											required
+											disabled
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Email</label>
+										<input
+											v-model="editForm.email"
+											type="email"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Teacher ID</label>
+										<input
+											v-model="editForm.id"
+											type="number"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+								</div>
+							</div>
 
-		<!-- Edit Form Modal -->
-		<Transition name="fade">
-		<div v-if="isEditing" class="modal-backdrop" @click.self="cancelEdit">
-		<div class="form-card card modal-panel">
-			<div class="form-header">
-				<h3 class="form-title">
-					<span class="material-icons">edit</span>
-					Edit Teacher
-				</h3>
-				<button class="btn btn-ghost btn-sm" @click="cancelEdit">Cancel</button>
+							<!-- Assignment -->
+							<div>
+								<div class="mb-4 flex items-center gap-2">
+									<BookOpen class="h-4 w-4 text-indigo-500" />
+									<h4 class="text-sm font-bold uppercase tracking-wide text-slate-700">Assignment</h4>
+								</div>
+								<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Subject</label>
+										<select
+											v-model="editForm.sub"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										>
+											<option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.subjects }}</option>
+										</select>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Quarter</label>
+										<select
+											v-model="editForm.qrt"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										>
+											<option value="1">Q1</option>
+											<option value="2">Q2</option>
+											<option value="3">Q3</option>
+											<option value="4">Q4</option>
+										</select>
+									</div>
+									<div>
+										<label class="mb-1.5 block text-sm font-semibold text-slate-700">Year</label>
+										<input
+											v-model="editForm.yr"
+											type="number"
+											required
+											class="block w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+										/>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Actions -->
+						<div class="mt-6 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+							<button
+								type="button"
+								@click="cancelEdit"
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 sm:w-auto"
+							>
+								<Save class="h-4 w-4" />
+								Save Changes
+							</button>
+						</div>
+					</form>
+				</div>
 			</div>
-			<form @submit.prevent="saveEdit" class="form-layout">
-				<div class="form-section">
-					<div class="form-section-header">
-						<span class="material-icons">badge</span>
-						<h4>Personal Info</h4>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>First Name</label>
-							<input v-model="editForm.fn" type="text" required />
-						</div>
-						<div class="form-group">
-							<label>Last Name</label>
-							<input v-model="editForm.ln" type="text" required />
-						</div>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>Email</label>
-							<input v-model="editForm.email" type="email" required />
-						</div>
-						<div class="form-group">
-							<label>ID</label>
-							<input v-model="editForm.id" type="number" required />
-						</div>
-					</div>
-				</div>
-
-				<div class="form-section">
-					<div class="form-section-header">
-						<span class="material-icons">school</span>
-						<h4>Assignment</h4>
-					</div>
-					<div class="form-row">
-						<div class="form-group">
-							<label>Subject</label>
-							<select v-model="editForm.sub" required>
-								<option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.subjects }}</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<label>Quarter</label>
-							<select v-model="editForm.qrt" required>
-								<option value="1">Q1</option>
-								<option value="2">Q2</option>
-								<option value="3">Q3</option>
-								<option value="4">Q4</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<label>Year</label>
-							<input v-model="editForm.yr" type="number" required />
-						</div>
-					</div>
-				</div>
-
-				<div class="form-actions">
-					<button type="submit" class="btn btn-primary">
-						<span class="material-icons" style="font-size: 1.125rem">save</span>
-						Save Changes
-					</button>
-					<button type="button" class="btn btn-ghost" @click="cancelEdit">Cancel</button>
-				</div>
-			</form>
-		</div>
-		</div>
 		</Transition>
-	</div>
+	</Teleport>
 </template>
-
-<style scoped>
-.manage-section {
-	animation: fadeIn 0.3s ease;
-}
-
-.card-actions-dual {
-	display: flex;
-	gap: var(--space-2);
-}
-.card-actions-dual .btn-card-action {
-	flex: 1;
-}
-
-.form-card {
-	padding: var(--space-6);
-	max-width: 800px;
-}
-
-.form-title {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	margin-bottom: var(--space-4);
-	font-size: 1.0625rem;
-}
-.form-title .material-icons {
-	color: var(--color-primary);
-}
-
-.form-layout {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-5);
-}
-
-.form-section {
-	background: #f8fafc;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-lg);
-	padding: var(--space-5);
-}
-
-.form-section-header {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	margin-bottom: var(--space-4);
-}
-.form-section-header .material-icons {
-	font-size: 1.25rem;
-	color: var(--color-primary);
-}
-.form-section-header h4 {
-	font-size: 0.9375rem;
-	font-weight: 600;
-	margin: 0;
-}
-
-.form-row {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: var(--space-4);
-}
-
-.form-group label {
-	display: block;
-	font-size: 0.875rem;
-	font-weight: 600;
-	color: var(--color-text-secondary);
-	margin-bottom: var(--space-2);
-}
-
-.form-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: var(--space-5);
-}
-.form-header h3 {
-	margin: 0;
-}
-
-.form-actions {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-}
-
-/* Manage Toolbar */
-.manage-toolbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-4);
-	margin-bottom: var(--space-4);
-}
-
-.manage-search-wrap {
-	position: relative;
-	flex: 1;
-	max-width: 480px;
-}
-
-.btn-add-user {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2);
-	white-space: nowrap;
-}
-
-/* Modals */
-.modal-backdrop {
-	position: fixed;
-	inset: 0;
-	background: rgba(15, 23, 42, 0.4);
-	backdrop-filter: blur(4px);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 9999;
-	padding: var(--space-4);
-}
-
-.modal-panel {
-	max-height: 90vh;
-	overflow-y: auto;
-	width: 100%;
-	max-width: 800px;
-	margin: 0;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-	transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-	opacity: 0;
-}
-
-.manage-search-wrap .search-icon {
-	position: absolute;
-	left: 0.875rem;
-	top: 50%;
-	transform: translateY(-50%);
-	color: #94a3b8;
-	font-size: 1.25rem;
-	pointer-events: none;
-}
-
-.manage-search-input {
-	width: 100%;
-	padding: 0.625rem 2.5rem 0.625rem 2.75rem;
-	border: 1px solid #cbd5e1;
-	border-radius: var(--radius-lg);
-	background: #fff;
-	font-size: 0.875rem;
-	color: #0f172a;
-	outline: none;
-	transition: border-color 0.2s;
-}
-.manage-search-input:focus {
-	border-color: var(--color-primary);
-	box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.clear-search {
-	position: absolute;
-	right: 0.625rem;
-	top: 50%;
-	transform: translateY(-50%);
-	color: #94a3b8;
-	cursor: pointer;
-	display: flex;
-	padding: 2px;
-	border-radius: var(--radius-full);
-	transition: all var(--transition-fast);
-}
-.clear-search:hover {
-	color: #64748b;
-	background: #f1f5f9;
-}
-.clear-search .material-icons-outlined {
-	font-size: 1.125rem;
-}
-
-/* Password toggle */
-.password-wrap {
-	position: relative;
-}
-.password-wrap input {
-	padding-right: 2.75rem;
-}
-.toggle-pw {
-	position: absolute;
-	right: 0.5rem;
-	top: 50%;
-	transform: translateY(-50%);
-	background: none;
-	border: none;
-	cursor: pointer;
-	color: #94a3b8;
-	padding: 4px;
-	display: flex;
-	border-radius: var(--radius-sm);
-	transition: all var(--transition-fast);
-}
-.toggle-pw:hover {
-	color: #64748b;
-	background: #f1f5f9;
-}
-.toggle-pw .material-icons-outlined {
-	font-size: 1.25rem;
-}
-
-/* Card Grid */
-.card-grid {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: var(--space-4);
-}
-
-.admin-teacher-card {
-	background: #ffffff;
-	border-radius: var(--radius-lg);
-	display: flex;
-	flex-direction: column;
-	border-left: 4px solid #f59e0b;
-	transition: all var(--transition-base);
-}
-.admin-teacher-card.card-evaluated { border-left-color: #16a34a; }
-
-.admin-teacher-card .card-inner {
-	padding: var(--space-5);
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-}
-
-.admin-teacher-card .card-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: var(--space-3);
-}
-
-.admin-teacher-card .profile-section {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-	min-width: 0;
-}
-
-.admin-teacher-card .person-icon {
-	width: 48px;
-	height: 48px;
-	border-radius: 14px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-}
-.admin-teacher-card .person-icon .material-icons-outlined {
-	font-size: 1.5rem;
-}
-.admin-teacher-card .icon-evaluated {
-	background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-	color: #16a34a;
-}
-.admin-teacher-card .icon-pending {
-	background: linear-gradient(135deg, #fef3c7, #fde68a);
-	color: #d97706;
-}
-
-.admin-teacher-card .teacher-info {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-}
-
-.admin-teacher-card .teacher-info h3 {
-	font-size: 1.0625rem;
-	font-weight: 700;
-	color: #0f172a;
-	margin: 0 0 2px 0;
-	line-height: 1.2;
-	white-space: normal;
-	word-break: break-word;
-}
-
-.admin-teacher-card .teacher-info .subject {
-	font-size: 0.8125rem;
-	color: #64748b;
-	margin: 0;
-	white-space: normal;
-	word-break: break-word;
-}
-
-.admin-teacher-card .card-meta {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-2);
-	margin-top: var(--space-4);
-	flex: 1;
-	align-content: flex-start;
-}
-
-.admin-teacher-card .meta-tag {
-	font-size: 0.7rem;
-	font-weight: 500;
-	color: #64748b;
-	background: #f8fafc;
-	border: 1px solid #e2e8f0;
-	padding: 2px 8px;
-	border-radius: 6px;
-	white-space: nowrap;
-}
-
-.admin-teacher-card .card-footer {
-	margin-top: var(--space-4);
-	display: flex;
-}
-
-.admin-teacher-card .btn-card-action {
-	width: 100%;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-2);
-	padding: 0.625rem 1rem;
-	font-weight: 600;
-	font-size: 0.8125rem;
-	border-radius: var(--radius-md);
-	cursor: pointer;
-	transition: all 0.2s;
-	background: #ffffff;
-	border: 1px solid #94a3b8;
-	color: #0f172a;
-}
-.admin-teacher-card .btn-card-action:hover:not(:disabled) {
-	background: #f8fafc;
-	border-color: #64748b;
-}
-
-.admin-teacher-card .btn-card-danger {
-	background: #fef2f2;
-	border-color: #fca5a5;
-	color: #dc2626;
-}
-.admin-teacher-card .btn-card-danger:hover:not(:disabled) {
-	background: #fee2e2;
-	border-color: #ef4444;
-}
-
-.admin-teacher-card .action-disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-.admin-teacher-card .action-disabled:hover {
-	background: #fef2f2 !important;
-	border-color: #fca5a5 !important;
-}
-
-.admin-teacher-card .btn-icon {
-	font-size: 1.125rem;
-}
-
-/* Empty state */
-.empty-state {
-	grid-column: 1 / -1;
-	text-align: center;
-	padding: var(--space-12);
-	color: var(--color-text-muted);
-}
-
-.empty-state .material-icons {
-	font-size: 3rem;
-	margin-bottom: var(--space-3);
-	color: var(--color-bg-muted);
-}
-
-@media (max-width: 768px) {
-	.card-grid {
-		grid-template-columns: 1fr;
-	}
-	.form-row {
-		grid-template-columns: 1fr;
-	}
-}
-</style>

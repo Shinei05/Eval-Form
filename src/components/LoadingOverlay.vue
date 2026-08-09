@@ -5,12 +5,14 @@ defineProps({
 </script>
 
 <template>
+	<Teleport to="body">
 	<div class="loading-overlay">
 		<div class="loading-content">
 			<div class="spinner"></div>
 			<p>{{ message }}</p>
 		</div>
 	</div>
+	</Teleport>
 </template>
 
 <style scoped>

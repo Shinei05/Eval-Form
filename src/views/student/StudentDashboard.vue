@@ -1,565 +1,336 @@
+<template>
+  <div class="w-full font-sans">
+    <!-- Loading overlay -->
+    <LoadingOverlay v-if="pageLoading" />
+
+    <template v-else>
+      <div class="animate-fade-up">
+        <div class="flex items-center gap-3">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 shadow-sm">
+            <LayoutDashboard class="h-6 w-6" />
+          </div>
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+              Welcome {{ studentFullName }}!
+            </h2>
+            <div class="mt-2 flex flex-wrap items-center gap-2.5">
+              <p class="text-sm text-ink-soft">Evaluation System</p>
+              <span class="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800">
+                {{ schoolYear || '2025-2026' }} | {{ currentPeriod ? formatPeriodLabel(currentPeriod) + ' Period' : '1st Period' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Default Password Warning Alert -->
+      <section
+        v-if="verified !== '1'"
+        aria-labelledby="password-alert-title"
+        class="mt-6 flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5"
+      >
+        <div class="flex gap-3.5">
+          <span
+            class="inline-flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-amber-100 text-amber-800"
+            aria-hidden="true"
+          >
+            <TriangleAlert class="h-5 w-5" />
+          </span>
+          <div>
+            <h3 id="password-alert-title" class="text-sm font-bold text-amber-900">
+              Change Your Password
+            </h3>
+            <p class="mt-1 text-sm leading-relaxed text-amber-900/85">
+              You are currently logged in with a default password. Please update your password in
+              Settings for better account security.
+            </p>
+          </div>
+        </div>
+        <router-link
+          to="/student/settings"
+          class="inline-flex flex-none items-center justify-center rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white shadow-soft transition-colors hover:bg-amber-800"
+        >
+          Go to Settings
+        </router-link>
+      </section>
+
+      <!-- Summary Stats Grid -->
+      <section aria-label="Evaluation summary" class="mt-6 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          :icon="UsersRound"
+          :value="pendingCount"
+          label="Available evaluations"
+          helper="Teachers ready for your feedback"
+          icon-bg="bg-indigo-50"
+          icon-fg="text-indigo-700"
+        />
+        <StatCard
+          :icon="CheckCircle2"
+          :value="evaluatedCount"
+          label="Evaluations completed"
+          helper="You've submitted these so far"
+          icon-bg="bg-emerald-50"
+          icon-fg="text-emerald-700"
+        />
+        <StatCard
+          :icon="ClipboardList"
+          :value="pendingCount"
+          label="Pending evaluations"
+          helper="Waiting for your response"
+          icon-bg="bg-amber-50"
+          icon-fg="text-amber-800"
+        />
+      </section>
+
+      <!-- Teachers Section -->
+      <section aria-label="Your teachers" class="mt-6">
+        <!-- Filter Controls Bar -->
+        <div class="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+          <div class="relative w-full sm:max-w-sm">
+            <Search
+              class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+              aria-hidden="true"
+            />
+            <label htmlFor="teacher-search" class="sr-only">
+              Search teachers
+            </label>
+            <input
+              id="teacher-search"
+              type="search"
+              v-model="searchQuery"
+              placeholder="Search teachers..."
+              class="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-3.5 text-sm text-ink transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              @click="hideEvaluated = !hideEvaluated"
+              :aria-pressed="hideEvaluated"
+              :class="[
+                'inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition-colors',
+                hideEvaluated
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-800'
+                  : 'border-line bg-white text-ink-soft hover:bg-slate-50'
+              ]"
+            >
+              <EyeOff class="h-4 w-4" aria-hidden="true" />
+              Hide Evaluated
+            </button>
+
+            <div class="relative">
+              <ArrowUpDown
+                class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
+                aria-hidden="true"
+              />
+              <label htmlFor="teacher-sort" class="sr-only">
+                Sort teachers
+              </label>
+              <select
+                id="teacher-sort"
+                v-model="sortBy"
+                class="appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-9 text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="subject">Sort by Subject</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Teachers Grid -->
+        <div v-if="filteredTeachers.length > 0" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TeacherCard
+            v-for="teacher in filteredTeachers"
+            :key="teacher.id || teacher.teacher_id"
+            :teacher="teacher"
+            @evaluate="startEval(teacher.id || teacher.teacher_id)"
+          />
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-soft">
+          <span
+            class="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-ink-muted"
+            aria-hidden="true"
+          >
+            <Search class="h-5 w-5" />
+          </span>
+          <p class="mt-3 text-sm font-bold text-ink">No teachers match your filters</p>
+          <p class="mt-1 text-xs text-ink-muted">Try resetting your search query or toggling filters</p>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="mt-6 flex justify-center">
+          <Pagination
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @page-change="goToPage"
+          />
+        </div>
+      </section>
+    </template>
+  </div>
+</template>
+
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import { useApi } from "../../composables/useApi";
-import { useAuth } from "../../composables/useAuth";
-import LoadingOverlay from "../../components/LoadingOverlay.vue";
-import TeacherCard from "../../components/TeacherCard.vue";
-import Pagination from "../../components/Pagination.vue";
-import API from "../../utils/api";
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  ArrowUpDown,
+  CheckCircle2,
+  ClipboardList,
+  EyeOff,
+  Search,
+  TriangleAlert,
+  UsersRound,
+  LayoutDashboard,
+} from '@lucide/vue'
+import StatCard from '../../components/dashboard/StatCard.vue'
+import TeacherCard from '../../components/dashboard/TeacherCard.vue'
+import LoadingOverlay from '../../components/LoadingOverlay.vue'
+import Pagination from '../../components/Pagination.vue'
+import { useApi } from '../../composables/useApi'
+import { useAuth } from '../../composables/useAuth'
+import { getUserData } from '../../utils/auth'
+import API from '../../utils/api'
 
-const router = useRouter();
-const { request, isLoading } = useApi();
-const pageLoading = ref(true);
-const { requireAuth } = useAuth();
+const router = useRouter()
+const { request } = useApi()
+const { requireAuth } = useAuth()
 
+const pageLoading = ref(true)
 const userProfile = ref({
-	userId: null,
-	studentId: null,
-	email: "",
-	firstname: "",
-	lastname: "",
-	fullname: "",
-});
+  userId: null,
+  studentId: null,
+  email: '',
+  firstname: '',
+  lastname: '',
+  fullname: '',
+  isVerified: true,
+})
 
-const verified = ref("1");
+// Fix 5: derive verified state from profile — no extra API call needed
+const verified = computed(() => userProfile.value.isVerified ? '1' : '0')
+const teachers = ref([])
+const searchQuery = ref('')
+const sortBy = ref('name')
+const hideEvaluated = ref(false)
+const currentPage = ref(1)
+const perPage = 12
+const totalCount = ref(0)
+const evaluatedCount = ref(0)
+const pendingCount = ref(0)
+const currentPeriod = ref(0)
+const schoolYear = ref('')
 
-// Data
-const teachers = ref([]);
-const subjects = ref([]);
-const searchQuery = ref("");
-const sortBy = ref("name");
-const subjectFilter = ref("");
-const showEvaluated = ref(true);
-const currentPage = ref(1);
-const perPage = 12;
-const totalCount = ref(0);
-const evaluatedCount = ref(0);
-const pendingCount = ref(0);
-const currentPeriod = ref(0);
-const schoolYear = ref("");
-
-const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / perPage)));
 const studentFullName = computed(() => {
-	const explicit = (userProfile.value.fullname || "").trim();
-	if (explicit) return explicit;
-	const first = (userProfile.value.firstname || "").trim();
-	const last = (userProfile.value.lastname || "").trim();
-	const full = `${first} ${last}`.trim();
-	return full || "Student";
-});
+  const explicit = (userProfile.value.fullname || '').trim()
+  if (explicit) return explicit
+  const first = (userProfile.value.firstname || '').trim()
+  const last = (userProfile.value.lastname || '').trim()
+  const full = `${first} ${last}`.trim()
+  return full || 'Student'
+})
+
+const filteredTeachers = computed(() => {
+  return teachers.value.filter((teacher) => {
+    const isCompleted = teacher.status === 'completed' || teacher.is_evaluated || teacher.evaluated
+    if (hideEvaluated.value && isCompleted) return false
+    return true
+  })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / perPage)))
 
 function goToPage(page) {
-	currentPage.value = Math.max(1, Math.min(page, totalPages.value));
+  currentPage.value = Math.max(1, Math.min(page, totalPages.value))
 }
 
-watch([searchQuery, subjectFilter, showEvaluated, sortBy], () => {
-	currentPage.value = 1;
-	fetchTeachers();
-});
+watch([searchQuery, hideEvaluated, sortBy], () => {
+  currentPage.value = 1
+  fetchTeachers()
+})
 
 watch(currentPage, () => {
-	fetchTeachers();
-});
+  fetchTeachers()
+})
 
 async function fetchTeachers() {
-	if (!userProfile.value.studentId) {
-		pageLoading.value = false;
-		return;
-	}
-	const result = await request(API.teachersList, {
-		body: {
-			action: "getTeachers",
-			id: userProfile.value.studentId,
-			page: currentPage.value,
-			perPage,
-			search: searchQuery.value,
-			subject: subjectFilter.value,
-			sortBy: sortBy.value,
-			showEvaluated: showEvaluated.value,
-		},
-	});
-	if (result.success) {
-		teachers.value = result.teachers || [];
-		subjects.value = result.subjects || [];
-		totalCount.value = result.total || 0;
-		evaluatedCount.value = result.evaluatedCount || 0;
-		pendingCount.value = result.pendingCount || 0;
-	}
-	pageLoading.value = false;
+  const studentData = getUserData() || {}
+  const studentIdToUse =
+    userProfile.value.studentId ||
+    userProfile.value.userId ||
+    studentData.student_id ||
+    studentData.user_id ||
+    studentData.id
+
+  if (!studentIdToUse) return
+
+  const result = await request(API.teachersList, {
+    body: {
+      action: 'getTeachers',
+      id: studentIdToUse,
+      page: currentPage.value,
+      perPage,
+      search: searchQuery.value,
+      sortBy: sortBy.value,
+      showEvaluated: !hideEvaluated.value,
+    },
+  })
+  if (result.success) {
+    teachers.value = result.teachers || []
+    totalCount.value = result.total || result.teachers?.length || 0
+    evaluatedCount.value = result.evaluatedCount || 0
+    pendingCount.value = result.pendingCount || 0
+  }
 }
 
 function startEval(teacherId) {
-	router.push(`/student-eval/${teacherId}`);
+  router.push(`/student-eval/${teacherId}`)
 }
 
 function formatPeriodLabel(periodNumber) {
-	const labels = ["1st", "2nd", "3rd", "4th"];
-	return labels[periodNumber - 1] || "—";
+  const labels = ['1st', '2nd', '3rd', '4th']
+  return labels[periodNumber - 1] || '—'
 }
 
 async function fetchSchedule() {
-	const result = await request(API.schedule, { body: { action: "getTime" } });
-	if (result.success) {
-		currentPeriod.value = Number(result.currentPeriod || 0);
-		schoolYear.value = result.times?.school_year || "";
-	}
+  const result = await request(API.schedule, { body: { action: 'getTime' } })
+  if (result.success) {
+    currentPeriod.value = Number(result.currentPeriod || 0)
+    schoolYear.value = result.times?.school_year || ''
+  }
 }
 
 async function loadProfile() {
-	const result = await request(API.profile, { method: "GET" });
-	if (result.success) {
-		const profile = result.profile || {};
-		userProfile.value = {
-			userId: profile.userId || null,
-			studentId: profile.studentId || null,
-			email: profile.email || "",
-			firstname: profile.firstname || "",
-			lastname: profile.lastname || "",
-			fullname: profile.fullname || "",
-		};
-	}
+  const result = await request(API.profile, { method: 'GET' })
+  if (result.success) {
+    const profile = result.profile || {}
+    userProfile.value = {
+      userId: profile.userId || profile.id || null,
+      studentId: profile.studentId || profile.student_id || null,
+      email: profile.email || '',
+      firstname: profile.firstname || '',
+      lastname: profile.lastname || '',
+      fullname: profile.fullname || '',
+      // Fix 5: read isVerified directly from profile — avoids the extra verificationCheck call
+      isVerified: profile.isVerified !== undefined ? profile.isVerified : true,
+    }
+  }
 }
 
-async function checkVerification() {
-	const result = await request(API.verificationCheck, {
-		body: { email: userProfile.value.email },
-	});
-	if (result.success) {
-		verified.value = result.verified ? "1" : "0";
-	}
-}
-
-onMounted(() => {
-	if (!requireAuth()) return;
-	loadProfile().then(() => {
-		fetchSchedule();
-		checkVerification();
-		fetchTeachers();
-	});
-});
+onMounted(async () => {
+  if (!requireAuth()) return
+  try {
+    await loadProfile()
+    // Fix 5: checkVerification removed — isVerified now read from profile
+    await Promise.all([fetchSchedule(), fetchTeachers()])
+  } catch (err) {
+    console.error('Error initializing dashboard:', err)
+  } finally {
+    pageLoading.value = false
+  }
+})
 </script>
-
-<template>
-	<LoadingOverlay v-if="pageLoading" />
-
-	<div class="dashboard-content">
-		<div class="welcome-header">
-			<h2>Welcome {{ studentFullName }}!</h2>
-			<p>
-				Evaluation System
-				<span class="period-tag">
-					{{ schoolYear || "School Year" }}
-					|
-					{{ currentPeriod ? formatPeriodLabel(currentPeriod) + " Period" : "Evaluations Closed" }}
-				</span>
-			</p>
-		</div>
-
-		<!-- Change Password Banner -->
-		<div v-if="verified !== '1'" class="verify-banner card" style="border-left: 4px solid #f59e0b; background: #fffbeb; border-color: #fde68a;">
-			<div class="verify-left">
-				<span class="material-icons verify-icon" style="color: #d97706;">warning</span>
-				<div>
-					<h3 style="color: #78350f; font-weight: 600; margin: 0 0 var(--space-1) 0; font-size: 1rem;">Change Your Password</h3>
-					<p style="color: #b45309; margin: 0; font-size: 0.8125rem;">
-						You are currently logged in with a default password. Please update your password in Settings for better account security.
-					</p>
-				</div>
-			</div>
-			<div class="verify-right">
-				<router-link
-					to="/student/settings"
-					class="btn btn-warning btn-sm"
-					style="background-color: #d97706; border-color: #d97706; color: white; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 4px; display: inline-block;"
-				>
-					Go to Settings
-				</router-link>
-			</div>
-		</div>
-		<div class="stats-grid">
-			<div class="stat-card card-available">
-				<div class="stat-body">
-					<div class="stat-icon-wrap icon-available">
-						<span class="material-icons-outlined">people</span>
-					</div>
-					<div class="stat-info">
-						<span class="stat-value">{{ totalCount }}</span>
-						<span class="stat-label">Available Evaluations</span>
-					</div>
-				</div>
-				<div class="stat-footer">
-					<span class="stat-desc">Teachers ready for your feedback</span>
-				</div>
-			</div>
-
-			<div class="stat-card card-completed">
-				<div class="stat-body">
-					<div class="stat-icon-wrap icon-completed">
-						<span class="material-icons-outlined">check_circle</span>
-					</div>
-					<div class="stat-info">
-						<span class="stat-value">{{ evaluatedCount }}</span>
-						<span class="stat-label">Evaluations Completed</span>
-					</div>
-				</div>
-				<div class="stat-footer">
-					<span class="stat-desc">You've submitted these so far</span>
-				</div>
-			</div>
-
-			<div class="stat-card card-pending">
-				<div class="stat-body">
-					<div class="stat-icon-wrap icon-pending">
-						<span class="material-icons-outlined">pending_actions</span>
-					</div>
-					<div class="stat-info">
-						<span class="stat-value">{{ pendingCount }}</span>
-						<span class="stat-label">Pending Evaluations</span>
-					</div>
-				</div>
-				<div class="stat-footer">
-					<span class="stat-desc">Waiting for your response</span>
-				</div>
-			</div>
-		</div>
-
-		<div class="controls-bar">
-			<div class="search-wrap">
-				<span class="material-icons-outlined search-icon">search</span>
-				<input v-model="searchQuery" type="text" placeholder="Search teachers..." class="search-input" />
-			</div>
-			<div class="controls-actions">
-				<button class="ctrl-btn" :class="{ active: !showEvaluated }" @click="showEvaluated = !showEvaluated">
-					<span class="material-icons-outlined">filter_alt</span> Hide Evaluated
-				</button>
-				<select v-model="sortBy" class="ctrl-select">
-					<option value="name">Sort by Name</option>
-					<option value="subject">Sort by Subject</option>
-				</select>
-			</div>
-		</div>
-
-		<!-- Teacher Grid -->
-		<div class="teacher-grid">
-			<TeacherCard
-				v-for="teacher in teachers"
-				:key="teacher.id"
-				:teacher="teacher"
-				@action="startEval"
-			/>
-
-			<div v-if="teachers.length === 0" class="empty-state">
-				<span class="material-icons">person_search</span>
-				<p>No teachers found</p>
-			</div>
-		</div>
-
-		<Pagination
-			:current-page="currentPage"
-			:total-pages="totalPages"
-			:total-items="totalCount"
-			:per-page="perPage"
-			@page-change="goToPage($event)"
-		/>
-	</div>
-</template>
-
-<style scoped>
-.dashboard-content {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-6);
-}
-
-.welcome-header {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-
-.period-tag {
-	display: inline-flex;
-	align-items: center;
-	margin-left: var(--space-2);
-	padding: 2px 8px;
-	border-radius: 9999px;
-	background: #eef2ff;
-	color: #4f46e5;
-	font-size: 0.75rem;
-	font-weight: 600;
-}
-
-.stats-grid {
-	display: grid;
-	grid-template-columns: repeat(1, 1fr);
-	gap: var(--space-6);
-}
-@media (min-width: 768px) {
-	.stats-grid {
-		grid-template-columns: repeat(3, 1fr);
-	}
-}
-
-.stat-card {
-	border-radius: var(--radius-lg);
-	display: flex;
-	flex-direction: column;
-	border: 1px solid;
-}
-
-.card-available { background: #faf5ff; border-color: #e9d5ff; }
-.card-completed { background: #f0fdf4; border-color: #bbf7d0; }
-.card-pending { background: #fff7ed; border-color: #fed7aa; }
-
-.stat-body {
-	display: flex;
-	align-items: center;
-	gap: var(--space-4);
-	padding: var(--space-5) var(--space-6) var(--space-3);
-}
-
-.stat-icon-wrap {
-	width: 50px;
-	height: 50px;
-	border-radius: 14px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-}
-.stat-icon-wrap .material-icons-outlined {
-	font-size: 1.5rem;
-}
-.icon-available {
-	background: #ede9fe;
-	color: #7c3aed;
-}
-.icon-completed {
-	background: #bbf7d0;
-	color: #16a34a;
-}
-.icon-pending {
-	background: #fed7aa;
-	color: #ea580c;
-}
-
-.stat-info {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-}
-
-.stat-value {
-	font-size: 2rem;
-	font-weight: 800;
-	color: #0f172a;
-	line-height: 1.1;
-	letter-spacing: -0.02em;
-}
-
-.stat-label {
-	font-size: 0.8rem;
-	font-weight: 600;
-	color: #64748b;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.stat-footer {
-	padding: var(--space-2) var(--space-6) var(--space-4);
-}
-
-.stat-desc {
-	font-size: 0.75rem;
-	color: #94a3b8;
-}
-
-/* Controls Bar */
-.controls-bar {
-	display: flex;
-	align-items: center;
-	gap: var(--space-4);
-	padding: var(--space-4) var(--space-5);
-	background: #f8fafc;
-	border: 1px solid #e2e8f0;
-	border-radius: var(--radius-lg);
-}
-
-.search-wrap {
-	position: relative;
-	flex: 1;
-	max-width: 340px;
-}
-
-.search-icon {
-	position: absolute;
-	left: 0.875rem;
-	top: 50%;
-	transform: translateY(-50%);
-	color: #94a3b8;
-	font-size: 1.25rem;
-}
-
-.search-input {
-	width: 100%;
-	padding: 0.5625rem 1rem 0.5625rem 2.625rem;
-	border: 1px solid #cbd5e1;
-	border-radius: var(--radius-md);
-	background: #fff;
-	font-size: 0.875rem;
-	color: #0f172a;
-	outline: none;
-	transition: border-color 0.2s;
-}
-.search-input:focus {
-	border-color: #6366f1;
-}
-
-.controls-actions {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-	margin-left: auto;
-}
-
-.ctrl-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	padding: 0.5rem 0.875rem;
-	font-size: 0.8125rem;
-	font-weight: 600;
-	color: #475569;
-	background: #fff;
-	border: 1px solid #cbd5e1;
-	border-radius: var(--radius-md);
-	cursor: pointer;
-	transition: all 0.15s;
-	white-space: nowrap;
-}
-.ctrl-btn:hover {
-	background: #f1f5f9;
-	border-color: #94a3b8;
-}
-.ctrl-btn.active {
-	background: #eef2ff;
-	border-color: #a5b4fc;
-	color: #4f46e5;
-}
-.ctrl-btn .material-icons-outlined {
-	font-size: 1.125rem;
-}
-
-.ctrl-select {
-	padding: 0.5rem 2.25rem 0.5rem 0.875rem;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	color: #475569;
-	background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 0.625rem center;
-	border: 1px solid #cbd5e1;
-	border-radius: var(--radius-md);
-	outline: none;
-	cursor: pointer;
-	appearance: none;
-	transition: border-color 0.2s;
-}
-.ctrl-select:focus {
-	border-color: #6366f1;
-}
-
-.btn-outline:hover {
-	background: #f8fafc;
-}
-
-.select-input {
-	background: #fff;
-	border: 1px solid #94a3b8;
-	color: #475569;
-	padding: 0.5rem 2.5rem 0.5rem 1rem;
-	border-radius: var(--radius-md);
-	font-size: 0.875rem;
-	cursor: pointer;
-	font-weight: 500;
-	outline: none;
-}
-
-/* Teacher Grid */
-.teacher-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-	gap: var(--space-4);
-}
-
-/* Empty State */
-.empty-state {
-	grid-column: 1 / -1;
-	text-align: center;
-	padding: var(--space-12);
-	color: var(--color-text-muted);
-}
-
-.empty-state .material-icons {
-	font-size: 3rem;
-	margin-bottom: var(--space-3);
-	color: var(--color-bg-muted);
-}
-
-.empty-state p {
-	font-size: 1rem;
-}
-
-@media (max-width: 768px) {
-	.controls-row {
-		flex-direction: column;
-		align-items: stretch;
-	}
-	.filters-wrap {
-		flex-direction: column;
-		align-items: stretch;
-	}
-	.search-wrap {
-		max-width: 100%;
-	}
-	.teacher-grid {
-		grid-template-columns: 1fr;
-	}
-}
-
-/* Verification Banner */
-.verify-banner {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: var(--space-4) var(--space-5);
-	margin-bottom: var(--space-6);
-	gap: var(--space-4);
-	flex-wrap: wrap;
-	border: 1px solid;
-	border-radius: var(--radius-lg);
-}
-
-.verify-left {
-	display: flex;
-	align-items: center;
-	gap: var(--space-3);
-}
-
-.verify-icon {
-	font-size: 1.75rem;
-}
-
-@media (max-width: 768px) {
-	.verify-banner {
-		flex-direction: column;
-		text-align: center;
-	}
-	.verify-left {
-		flex-direction: column;
-	}
-}
-</style>
