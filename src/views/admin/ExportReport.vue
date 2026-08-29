@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useRoute } from "vue-router";
@@ -8,7 +8,19 @@ import { useApi } from "../../composables/useApi";
 import depedLogo from "../../assets/DepEd-Logo.png";
 import bagongPinasLogo from "../../assets/bagongpinas.png";
 import jlgisLogo from "../../assets/JLGISlogo.png";
-import { ArrowLeft, FileText, School, Users, Layers, Download, Loader2, X } from "@lucide/vue";
+import {
+	ArrowLeft,
+	FileText,
+	School,
+	Users,
+	Layers,
+	Download,
+	Loader2,
+	X,
+	ChevronRight,
+	ChevronLeft,
+	Quote
+} from "@lucide/vue";
 
 const route = useRoute();
 const { isLoading, error, request } = useApi();
@@ -21,6 +33,8 @@ const peerCategories = ref([]);
 const printArea = ref(null);
 const showExportModal = ref(false);
 const exportLoading = ref(null);
+const isExporting = ref(false);
+
 const stats = ref({
 	studentCount: 0,
 	peerCount: 0,
@@ -32,71 +46,71 @@ const stats = ref({
 
 const reportDate = ref("");
 
+// Interactive Page navigation states (1 = Breakdown, 2 = Comments)
+const studentDocPage = ref(1);
+const peerDocPage = ref(1);
+
+// References for PDF rendering
+const studentPage1Ref = ref(null);
+const studentPage2Ref = ref(null);
+const peerPage1Ref = ref(null);
+const peerPage2Ref = ref(null);
+
+// Normalized comments lists
+const studentCommentsList = computed(() => {
+	return (studentEvals.value || []).map((e, idx) => ({
+		id: `student-eval-${idx}`,
+		index: idx + 1,
+		avg: Number(e.avg) || 0,
+		sentiment: e.sentiment || "Average",
+		feedback: (e.feedback || "").trim(),
+		created_at: e.created_at,
+	}));
+});
+
+const peerCommentsList = computed(() => {
+	return (peerEvals.value || []).map((e, idx) => ({
+		id: `peer-eval-${idx}`,
+		index: idx + 1,
+		avg: Number(e.avg) || 0,
+		sentiment: e.sentiment || "Average",
+		feedback: (e.feedback || "").trim(),
+		created_at: e.created_at,
+	}));
+});
+
 // Format rating levels based on numeric score
 function getAdjectivalRating(score) {
-	if (!score || score === 0) return "N/A";
-	if (score >= 4.5) return "Outstanding (Very Evident)";
-	if (score >= 3.5) return "Very Satisfactory";
-	if (score >= 2.5) return "Satisfactory (Sometimes Evident)";
-	if (score >= 1.5) return "Unsatisfactory";
+	const s = Number(score) || 0;
+	if (s === 0) return "N/A";
+	if (s >= 4.5) return "Outstanding (Very Evident)";
+	if (s >= 3.5) return "Very Satisfactory";
+	if (s >= 2.5) return "Satisfactory (Sometimes Evident)";
+	if (s >= 1.5) return "Unsatisfactory";
 	return "Poor (Not Evident)";
 }
 
-// Dynamic score style & rating tier palette
-function getScoreStyle(scoreNum) {
-	const score = Number(scoreNum) || 0;
-	if (score >= 4.5) {
-		return {
-			bar: '#059669',
-			badgeBg: '#ecfdf5',
-			badgeText: '#047857',
-			border: '#a7f3d0',
-			label: 'Outstanding'
-		};
-	}
-	if (score >= 3.5) {
-		return {
-			bar: '#2563eb',
-			badgeBg: '#eff6ff',
-			badgeText: '#1d4ed8',
-			border: '#bfdbfe',
-			label: 'Very Satisfactory'
-		};
-	}
-	if (score >= 2.5) {
-		return {
-			bar: '#4f46e5',
-			badgeBg: '#eef2ff',
-			badgeText: '#3730a3',
-			border: '#c7d2fe',
-			label: 'Satisfactory'
-		};
-	}
-	if (score >= 1.5) {
-		return {
-			bar: '#d97706',
-			badgeBg: '#fffbeb',
-			badgeText: '#b45309',
-			border: '#fde68a',
-			label: 'Unsatisfactory'
-		};
-	}
-	return {
-		bar: '#e11d48',
-		badgeBg: '#fef2f2',
-		badgeText: '#9f1239',
-		border: '#fecdd3',
-		label: 'Poor'
-	};
+function getRatingBadge(score) {
+	const s = Number(score) || 0;
+	if (s >= 4.5) return "Outstanding";
+	if (s >= 3.5) return "Very Satisfactory";
+	if (s >= 2.5) return "Satisfactory";
+	if (s >= 1.5) return "Unsatisfactory";
+	return "Poor";
 }
 
-// Sentiment CSS tag
-function getSentimentClass(sentiment) {
-	if (!sentiment) return "sentiment-neutral";
-	const s = sentiment.toLowerCase();
-	if (s.includes("positive")) return "sentiment-positive";
-	if (s.includes("negative")) return "sentiment-negative";
-	return "sentiment-neutral";
+function formatDate(iso) {
+	if (!iso) return "N/A";
+	try {
+		const d = new Date(iso);
+		return d.toLocaleDateString("en-US", {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+		});
+	} catch (e) {
+		return iso;
+	}
 }
 
 async function fetchReportData() {
@@ -128,47 +142,86 @@ function handleSavePdf() {
 async function doExport(target) {
 	exportLoading.value = target;
 	showExportModal.value = false;
+	isExporting.value = true;
 
 	const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "legal" });
 	const pageWidth  = pdf.internal.pageSize.getWidth();
 	const pageHeight = pdf.internal.pageSize.getHeight();
 
-	const pages = Array.from(printArea.value.querySelectorAll("[data-pdf-page]"));
-	const toExport = target === "both" ? pages
-		: target === "student" ? [pages[0]]
-		: [pages[1]];
+	const origStudentPage = studentDocPage.value;
+	const origPeerPage = peerDocPage.value;
 
-	for (let i = 0; i < toExport.length; i++) {
-		const canvas = await html2canvas(toExport[i], {
-			scale: 2,
-			useCORS: true,
-			backgroundColor: "#ffffff",
-			logging: false,
+	const captureTasks = [];
+
+	if (target === "student" || target === "both") {
+		captureTasks.push({
+			setPages: () => { studentDocPage.value = 1; },
+			getEl: () => studentPage1Ref.value,
 		});
-
-		const imgData = canvas.toDataURL("image/png");
-		let imgWidth  = pageWidth;
-		let imgHeight = (canvas.height * imgWidth) / canvas.width;
-		if (imgHeight > pageHeight) {
-			const ratio = pageHeight / imgHeight;
-			imgWidth  *= ratio;
-			imgHeight  = pageHeight;
-		}
-		const xOffset = (pageWidth - imgWidth) / 2;
-		if (i > 0) pdf.addPage();
-		pdf.addImage(imgData, "PNG", xOffset, 0, imgWidth, imgHeight, undefined, "FAST");
+		captureTasks.push({
+			setPages: () => { studentDocPage.value = 2; },
+			getEl: () => studentPage2Ref.value,
+		});
 	}
 
-	const safeDate = reportDate.value
-		.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-	const safeLastName = (teacher.value.lastname || "report")
-		.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-	const suffix = target === "student" ? "student-eval"
-		: target === "peer" ? "peer-eval" : "full-report";
-	const fileName = `teacher-report-${safeLastName}-${safeDate}-${suffix}.pdf`;
+	if (target === "peer" || target === "both") {
+		captureTasks.push({
+			setPages: () => { peerDocPage.value = 1; },
+			getEl: () => peerPage1Ref.value,
+		});
+		captureTasks.push({
+			setPages: () => { peerDocPage.value = 2; },
+			getEl: () => peerPage2Ref.value,
+		});
+	}
 
-	pdf.save(fileName);
-	exportLoading.value = null;
+	try {
+		for (let i = 0; i < captureTasks.length; i++) {
+			captureTasks[i].setPages();
+			await new Promise((r) => setTimeout(r, 120));
+			await document.fonts.ready;
+
+			const el = captureTasks[i].getEl();
+			if (!el) continue;
+
+			const canvas = await html2canvas(el, {
+				scale: 2,
+				useCORS: true,
+				backgroundColor: "#ffffff",
+				logging: false,
+			});
+
+			const imgData = canvas.toDataURL("image/png");
+			let imgWidth  = pageWidth;
+			let imgHeight = (canvas.height * imgWidth) / canvas.width;
+			if (imgHeight > pageHeight) {
+				const ratio = pageHeight / imgHeight;
+				imgWidth  *= ratio;
+				imgHeight  = pageHeight;
+			}
+			const xOffset = (pageWidth - imgWidth) / 2;
+
+			if (i > 0) pdf.addPage();
+			pdf.addImage(imgData, "PNG", xOffset, 0, imgWidth, imgHeight, undefined, "FAST");
+		}
+
+		const safeDate = reportDate.value
+			.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+		const safeLastName = (teacher.value.lastname || "report")
+			.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+		const suffix = target === "student" ? "student-eval"
+			: target === "peer" ? "peer-eval" : "full-report";
+		const fileName = `teacher-report-${safeLastName}-${safeDate}-${suffix}.pdf`;
+
+		pdf.save(fileName);
+	} catch (err) {
+		console.error("Export PDF error:", err);
+	} finally {
+		isExporting.value = false;
+		studentDocPage.value = origStudentPage;
+		peerDocPage.value = origPeerPage;
+		exportLoading.value = null;
+	}
 }
 
 onMounted(async () => {
@@ -183,7 +236,7 @@ onMounted(async () => {
 </script>
 
 <template>
-	<div class="export-report-container">
+	<div class="export-report-container" :class="{ 'is-exporting': isExporting }">
 		<!-- Loading state -->
 		<div v-if="isLoading" class="loading-state">
 			<div class="spinner"></div>
@@ -219,12 +272,34 @@ onMounted(async () => {
 
 				<!-- ── Doc 1: Student Evaluation Document ───── -->
 				<div class="doc-column">
+					<!-- Interactive Document Header & Page Navigation -->
 					<div class="doc-label no-print student-label">
-						<span class="doc-label-dot" style="background:#3b82f6"></span>
-						Student Evaluation Document
+						<div class="doc-label-left">
+							<span class="doc-label-dot" style="background:#3b82f6"></span>
+							Student Evaluation Document
+						</div>
+						<div class="page-nav-pills">
+							<button
+								type="button"
+								class="page-nav-btn"
+								:class="{ active: studentDocPage === 1 }"
+								@click="studentDocPage = 1"
+							>
+								Page 1: Ratings
+							</button>
+							<button
+								type="button"
+								class="page-nav-btn next-btn"
+								:class="{ active: studentDocPage === 2 }"
+								@click="studentDocPage = 2"
+							>
+								Page 2: Comments (Next →)
+							</button>
+						</div>
 					</div>
 
-					<div class="a4-page" data-pdf-page>
+					<!-- Student Doc Page 1: Ratings Breakdown -->
+					<div v-show="studentDocPage === 1" class="a4-page" ref="studentPage1Ref" data-pdf-page>
 						<!-- School Letterhead -->
 						<header class="doc-header">
 							<div class="logo-box">
@@ -244,93 +319,89 @@ onMounted(async () => {
 						<!-- Title -->
 						<div class="report-title-section">
 							<h2>TEACHER EVALUATION PERFORMANCE REPORT</h2>
-							<p class="subtitle">Student Evaluation Report &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
+							<p class="subtitle">Student Evaluation Performance Summary &nbsp;·&nbsp; Page 1 &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
 						</div>
 
-						<!-- Compact Side-by-Side: Profile + Summary Hero -->
-						<div class="profile-summary-grid">
-							<!-- Teacher Profile -->
-							<div class="profile-card">
-								<h4 class="card-title">Teacher Profile</h4>
-								<div class="meta-list">
-									<div class="meta-item">
-										<span class="meta-label">Name:</span>
-										<span class="meta-val font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Email:</span>
-										<span class="meta-val">{{ teacher.email }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Subject:</span>
-										<span class="meta-val font-bold">{{ teacher.subject_name }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Period:</span>
-										<span class="meta-val">Quarter {{ teacher.quarter }} | SY {{ teacher.year }}</span>
-									</div>
+						<!-- Executive Profile & Summary Overview Box -->
+						<div class="executive-summary-box">
+							<div class="summary-meta-grid">
+								<div class="meta-cell">
+									<span class="cell-label">Faculty Name</span>
+									<span class="cell-value font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Subject / Dept</span>
+									<span class="cell-value">{{ teacher.subject_name || 'General' }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Institutional Email</span>
+									<span class="cell-value">{{ teacher.email }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Evaluation Period</span>
+									<span class="cell-value font-semibold">Quarter {{ teacher.quarter }} &bull; SY {{ teacher.year }}</span>
 								</div>
 							</div>
 
-							<!-- Summary Hero Card -->
-							<div class="summary-hero-card" :style="{ borderColor: getScoreStyle(stats.studentAvg).border }">
-								<div class="hero-header">
-									<span class="hero-title">Overall Student Rating</span>
-									<span class="hero-badge">{{ stats.studentCount }} respondents</span>
+							<div class="summary-score-callout">
+								<div class="score-callout-top">
+									<span class="callout-title">Overall Student Rating</span>
+									<span class="callout-respondents">{{ stats.studentCount }} Respondents</span>
 								</div>
-								<div class="hero-body">
-									<span class="hero-score" :style="{ color: getScoreStyle(stats.studentAvg).bar }">{{ stats.studentAvg.toFixed(2) }}</span>
-									<span class="hero-scale">/ 5.00</span>
+								<div class="score-callout-number">
+									<span class="score-num">{{ stats.studentAvg ? stats.studentAvg.toFixed(2) : '0.00' }}</span>
+									<span class="score-max">/ 5.00</span>
 								</div>
-								<div class="hero-tag" :style="{ background: getScoreStyle(stats.studentAvg).badgeBg, color: getScoreStyle(stats.studentAvg).badgeText }">
+								<div class="score-callout-tier">
 									{{ getAdjectivalRating(stats.studentAvg) }}
 								</div>
-								<div class="hero-progress-track">
-									<div class="hero-progress-fill" :style="{ width: (stats.studentAvg / 5 * 100) + '%', background: getScoreStyle(stats.studentAvg).bar }"></div>
-								</div>
 							</div>
 						</div>
 
-						<!-- Student Category Breakdown — color-coded cards -->
+						<!-- Structured Category Breakdown Table -->
 						<section class="info-section">
-							<h3 class="section-heading">Student Evaluation — Category Breakdown</h3>
+							<h3 class="section-heading">Category Rating Breakdown</h3>
 							<div v-if="studentCategories.length === 0" class="no-data-msg">No student evaluations recorded.</div>
-							<div v-else class="cat-cards-list">
-								<div
-									v-for="(cat, idx) in studentCategories"
-									:key="cat.header"
-									class="cat-card"
-									:style="{ borderLeftColor: getScoreStyle(cat.avg_score).bar }"
-								>
-									<div class="cat-card-top">
-										<div class="cat-left">
-											<span class="cat-idx">{{ String(idx + 1).padStart(2, '0') }}</span>
-											<span class="cat-title">{{ cat.header }}</span>
-										</div>
-										<div
-											class="cat-score-badge"
-											:style="{
-												background: getScoreStyle(cat.avg_score).badgeBg,
-												color: getScoreStyle(cat.avg_score).badgeText,
-												borderColor: getScoreStyle(cat.avg_score).border
-											}"
-										>
-											<strong>{{ Number(cat.avg_score).toFixed(2) }}</strong> / 5.00
-											<span class="cat-rating-tag">{{ getScoreStyle(cat.avg_score).label }}</span>
-										</div>
-									</div>
-									<div class="cat-track">
-										<div
-											class="cat-fill"
-											:style="{
-												width: (Number(cat.avg_score) / 5 * 100) + '%',
-												background: getScoreStyle(cat.avg_score).bar
-											}"
-										></div>
-									</div>
-								</div>
-							</div>
+							<table v-else class="eval-data-table">
+								<thead>
+									<tr>
+										<th class="col-num">#</th>
+										<th class="col-domain">Performance Domain / Indicator</th>
+										<th class="col-score">Mean Score</th>
+										<th class="col-rating">Adjectival Rating</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(cat, idx) in studentCategories" :key="cat.header">
+										<td class="col-num">{{ String(idx + 1).padStart(2, '0') }}</td>
+										<td class="col-domain">
+											<span class="domain-text">{{ cat.header }}</span>
+										</td>
+										<td class="col-score font-bold">
+											{{ Number(cat.avg_score).toFixed(2) }} <span class="score-sub">/ 5.00</span>
+										</td>
+										<td class="col-rating">
+											<span class="rating-pill">{{ getRatingBadge(cat.avg_score) }}</span>
+										</td>
+									</tr>
+								</tbody>
+								<tfoot>
+									<tr class="tfoot-summary">
+										<td colspan="2" class="summary-label font-bold">OVERALL COMPOSITE STUDENT EVALUATION RATING</td>
+										<td class="col-score font-bold summary-score">{{ stats.studentAvg ? stats.studentAvg.toFixed(2) : '0.00' }} <span class="score-sub">/ 5.00</span></td>
+										<td class="col-rating font-bold summary-rating">{{ getRatingBadge(stats.studentAvg) }}</td>
+									</tr>
+								</tfoot>
+							</table>
 						</section>
+
+						<!-- Page Flip CTA -->
+						<div class="page-flip-row no-print">
+							<button type="button" @click="studentDocPage = 2" class="btn-page-flip">
+								<span>Next: View Student Comments (Page 2)</span>
+								<ChevronRight class="h-4 w-4" />
+							</button>
+						</div>
 
 						<!-- Signatures Section -->
 						<section class="signature-section">
@@ -355,17 +426,167 @@ onMounted(async () => {
 								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
 							</div>
 						</footer>
-					</div> <!-- /a4-page doc 1 -->
+					</div>
+
+					<!-- Student Doc Page 2: Comments & Feedback -->
+					<div v-show="studentDocPage === 2" class="a4-page" ref="studentPage2Ref" data-pdf-page>
+						<!-- School Letterhead -->
+						<header class="doc-header">
+							<div class="logo-box">
+								<img :src="depedLogo" alt="DepEd Logo" />
+							</div>
+							<div class="header-text">
+								<p class="line-sm">Republic of the Philippines</p>
+								<p class="line-md">Department of Education</p>
+								<p class="line-lg">SCHOOLS DIVISION OF OLONGAPO CITY</p>
+								<p class="line-school">JAMES L. GORDON INTEGRATED SCHOOL</p>
+							</div>
+							<div class="logo-box">
+								<img :src="bagongPinasLogo" alt="Bagong Pilipinas Logo" />
+							</div>
+						</header>
+
+						<!-- Title -->
+						<div class="report-title-section">
+							<h2>TEACHER EVALUATION COMMENTS &amp; FEEDBACK REPORT</h2>
+							<p class="subtitle">Student Feedback &amp; Qualitative Remarks &nbsp;·&nbsp; Page 2 &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
+						</div>
+
+						<!-- Executive Profile & Feedback Summary Box -->
+						<div class="executive-summary-box">
+							<div class="summary-meta-grid">
+								<div class="meta-cell">
+									<span class="cell-label">Faculty Name</span>
+									<span class="cell-value font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Subject / Dept</span>
+									<span class="cell-value">{{ teacher.subject_name || 'General' }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Evaluation Period</span>
+									<span class="cell-value font-semibold">Quarter {{ teacher.quarter }} &bull; SY {{ teacher.year }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Comments Submitted</span>
+									<span class="cell-value font-semibold">{{ studentCommentsList.filter(c => c.feedback).length }} Feedback Submissions</span>
+								</div>
+							</div>
+
+							<div class="summary-score-callout">
+								<div class="score-callout-top">
+									<span class="callout-title">Composite Student Score</span>
+									<span class="callout-respondents">{{ stats.studentCount }} Evaluators</span>
+								</div>
+								<div class="score-callout-number">
+									<span class="score-num">{{ stats.studentAvg ? stats.studentAvg.toFixed(2) : '0.00' }}</span>
+									<span class="score-max">/ 5.00</span>
+								</div>
+								<div class="score-callout-tier">
+									{{ getAdjectivalRating(stats.studentAvg) }}
+								</div>
+							</div>
+						</div>
+
+						<!-- Comments List Section -->
+						<section class="info-section comments-section-body">
+							<h3 class="section-heading">Student Feedback &amp; Qualitative Notes Register</h3>
+							<div v-if="studentCommentsList.length === 0" class="no-data-msg">
+								No student comments or feedback recorded for this evaluation period.
+							</div>
+							<div v-else class="comments-log-container">
+								<div
+									v-for="(c, idx) in studentCommentsList"
+									:key="c.id"
+									class="comment-log-card"
+								>
+									<div class="comment-log-header">
+										<div class="comment-idx-wrap">
+											<span class="comment-idx">#{{ String(idx + 1).padStart(2, '0') }}</span>
+											<span class="comment-source-tag">Student Evaluator</span>
+										</div>
+										<div class="comment-meta-badges">
+											<span class="comment-score-badge">
+												Rating: <strong>{{ c.avg.toFixed(2) }}</strong>
+											</span>
+											<span class="comment-sentiment-badge">
+												{{ c.sentiment }}
+											</span>
+											<span class="comment-date">{{ formatDate(c.created_at) }}</span>
+										</div>
+									</div>
+									<div class="comment-log-body">
+										<p v-if="c.feedback" class="comment-text">"{{ c.feedback }}"</p>
+										<p v-else class="comment-empty-text">(No additional written remarks provided.)</p>
+									</div>
+								</div>
+							</div>
+						</section>
+
+						<!-- Page Flip CTA -->
+						<div class="page-flip-row no-print">
+							<button type="button" @click="studentDocPage = 1" class="btn-page-flip btn-prev">
+								<ChevronLeft class="h-4 w-4" />
+								<span>Back: View Ratings Breakdown (Page 1)</span>
+							</button>
+						</div>
+
+						<!-- Signatures Section -->
+						<section class="signature-section">
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Prepared By (Admin)</p>
+							</div>
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Noted / Approved By (Principal)</p>
+							</div>
+						</section>
+
+						<!-- Document Footer -->
+						<footer class="doc-footer">
+							<div class="footer-logo">
+								<img :src="jlgisLogo" alt="JLGIS Logo" />
+							</div>
+							<div class="footer-lines">
+								<p><strong>Address:</strong> Foster St. Brgy. Kababae, Olongapo City 2200</p>
+								<p><strong>Tel. no.:</strong> (047) 222-4769 | <strong>Email:</strong> 500027@deped.gov.ph</p>
+								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
+							</div>
+						</footer>
+					</div>
 				</div> <!-- /doc-column 1 -->
 
 				<!-- ── Doc 2: Peer / Teacher Evaluation Document ────── -->
 				<div class="doc-column">
+					<!-- Interactive Document Header & Page Navigation -->
 					<div class="doc-label no-print peer-label">
-						<span class="doc-label-dot" style="background:#10b981"></span>
-						Peer / Teacher Evaluation
+						<div class="doc-label-left">
+							<span class="doc-label-dot" style="background:#10b981"></span>
+							Peer / Teacher Evaluation
+						</div>
+						<div class="page-nav-pills">
+							<button
+								type="button"
+								class="page-nav-btn"
+								:class="{ active: peerDocPage === 1 }"
+								@click="peerDocPage = 1"
+							>
+								Page 1: Ratings
+							</button>
+							<button
+								type="button"
+								class="page-nav-btn next-btn"
+								:class="{ active: peerDocPage === 2 }"
+								@click="peerDocPage = 2"
+							>
+								Page 2: Comments (Next →)
+							</button>
+						</div>
 					</div>
 
-					<div class="a4-page" data-pdf-page>
+					<!-- Peer Doc Page 1: Ratings Breakdown -->
+					<div v-show="peerDocPage === 1" class="a4-page" ref="peerPage1Ref" data-pdf-page>
 						<!-- School Letterhead -->
 						<header class="doc-header">
 							<div class="logo-box">
@@ -385,93 +606,89 @@ onMounted(async () => {
 						<!-- Title -->
 						<div class="report-title-section">
 							<h2>PEER / TEACHER EVALUATION PERFORMANCE REPORT</h2>
-							<p class="subtitle">Peer / Teacher Evaluation Report &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
+							<p class="subtitle">Colleague Peer Evaluation Summary &nbsp;·&nbsp; Page 1 &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
 						</div>
 
-						<!-- Compact Side-by-Side: Profile + Summary Hero -->
-						<div class="profile-summary-grid">
-							<!-- Teacher Profile -->
-							<div class="profile-card">
-								<h4 class="card-title">Teacher Profile</h4>
-								<div class="meta-list">
-									<div class="meta-item">
-										<span class="meta-label">Name:</span>
-										<span class="meta-val font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Email:</span>
-										<span class="meta-val">{{ teacher.email }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Subject:</span>
-										<span class="meta-val font-bold">{{ teacher.subject_name }}</span>
-									</div>
-									<div class="meta-item">
-										<span class="meta-label">Period:</span>
-										<span class="meta-val">Quarter {{ teacher.quarter }} | SY {{ teacher.year }}</span>
-									</div>
+						<!-- Executive Profile & Summary Overview Box -->
+						<div class="executive-summary-box">
+							<div class="summary-meta-grid">
+								<div class="meta-cell">
+									<span class="cell-label">Faculty Name</span>
+									<span class="cell-value font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Subject / Dept</span>
+									<span class="cell-value">{{ teacher.subject_name || 'General' }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Institutional Email</span>
+									<span class="cell-value">{{ teacher.email }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Evaluation Period</span>
+									<span class="cell-value font-semibold">Quarter {{ teacher.quarter }} &bull; SY {{ teacher.year }}</span>
 								</div>
 							</div>
 
-							<!-- Summary Hero Card -->
-							<div class="summary-hero-card" :style="{ borderColor: getScoreStyle(stats.peerAvg).border }">
-								<div class="hero-header">
-									<span class="hero-title">Overall Peer / Teacher Rating</span>
-									<span class="hero-badge">{{ stats.peerCount }} respondents</span>
+							<div class="summary-score-callout">
+								<div class="score-callout-top">
+									<span class="callout-title">Overall Peer Rating</span>
+									<span class="callout-respondents">{{ stats.peerCount }} Respondents</span>
 								</div>
-								<div class="hero-body">
-									<span class="hero-score" :style="{ color: getScoreStyle(stats.peerAvg).bar }">{{ stats.peerAvg.toFixed(2) }}</span>
-									<span class="hero-scale">/ 5.00</span>
+								<div class="score-callout-number">
+									<span class="score-num">{{ stats.peerAvg ? stats.peerAvg.toFixed(2) : '0.00' }}</span>
+									<span class="score-max">/ 5.00</span>
 								</div>
-								<div class="hero-tag" :style="{ background: getScoreStyle(stats.peerAvg).badgeBg, color: getScoreStyle(stats.peerAvg).badgeText }">
+								<div class="score-callout-tier">
 									{{ getAdjectivalRating(stats.peerAvg) }}
 								</div>
-								<div class="hero-progress-track">
-									<div class="hero-progress-fill" :style="{ width: (stats.peerAvg / 5 * 100) + '%', background: getScoreStyle(stats.peerAvg).bar }"></div>
-								</div>
 							</div>
 						</div>
 
-						<!-- Peer Category Breakdown — color-coded cards -->
+						<!-- Structured Category Breakdown Table -->
 						<section class="info-section">
-							<h3 class="section-heading">Peer / Teacher Evaluation — Category Breakdown</h3>
+							<h3 class="section-heading">Category Rating Breakdown</h3>
 							<div v-if="peerCategories.length === 0" class="no-data-msg">No peer/teacher evaluations recorded.</div>
-							<div v-else class="cat-cards-list">
-								<div
-									v-for="(cat, idx) in peerCategories"
-									:key="cat.header"
-									class="cat-card"
-									:style="{ borderLeftColor: getScoreStyle(cat.avg_score).bar }"
-								>
-									<div class="cat-card-top">
-										<div class="cat-left">
-											<span class="cat-idx">{{ String(idx + 1).padStart(2, '0') }}</span>
-											<span class="cat-title">{{ cat.header }}</span>
-										</div>
-										<div
-											class="cat-score-badge"
-											:style="{
-												background: getScoreStyle(cat.avg_score).badgeBg,
-												color: getScoreStyle(cat.avg_score).badgeText,
-												borderColor: getScoreStyle(cat.avg_score).border
-											}"
-										>
-											<strong>{{ Number(cat.avg_score).toFixed(2) }}</strong> / 5.00
-											<span class="cat-rating-tag">{{ getScoreStyle(cat.avg_score).label }}</span>
-										</div>
-									</div>
-									<div class="cat-track">
-										<div
-											class="cat-fill"
-											:style="{
-												width: (Number(cat.avg_score) / 5 * 100) + '%',
-												background: getScoreStyle(cat.avg_score).bar
-											}"
-										></div>
-									</div>
-								</div>
-							</div>
+							<table v-else class="eval-data-table">
+								<thead>
+									<tr>
+										<th class="col-num">#</th>
+										<th class="col-domain">Performance Domain / Indicator</th>
+										<th class="col-score">Mean Score</th>
+										<th class="col-rating">Adjectival Rating</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="(cat, idx) in peerCategories" :key="cat.header">
+										<td class="col-num">{{ String(idx + 1).padStart(2, '0') }}</td>
+										<td class="col-domain">
+											<span class="domain-text">{{ cat.header }}</span>
+										</td>
+										<td class="col-score font-bold">
+											{{ Number(cat.avg_score).toFixed(2) }} <span class="score-sub">/ 5.00</span>
+										</td>
+										<td class="col-rating">
+											<span class="rating-pill">{{ getRatingBadge(cat.avg_score) }}</span>
+										</td>
+									</tr>
+								</tbody>
+								<tfoot>
+									<tr class="tfoot-summary">
+										<td colspan="2" class="summary-label font-bold">OVERALL COMPOSITE PEER EVALUATION RATING</td>
+										<td class="col-score font-bold summary-score">{{ stats.peerAvg ? stats.peerAvg.toFixed(2) : '0.00' }} <span class="score-sub">/ 5.00</span></td>
+										<td class="col-rating font-bold summary-rating">{{ getRatingBadge(stats.peerAvg) }}</td>
+									</tr>
+								</tfoot>
+							</table>
 						</section>
+
+						<!-- Page Flip CTA -->
+						<div class="page-flip-row no-print">
+							<button type="button" @click="peerDocPage = 2" class="btn-page-flip">
+								<span>Next: View Peer Comments (Page 2)</span>
+								<ChevronRight class="h-4 w-4" />
+							</button>
+						</div>
 
 						<!-- Signatures Section -->
 						<section class="signature-section">
@@ -496,7 +713,135 @@ onMounted(async () => {
 								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
 							</div>
 						</footer>
-					</div> <!-- /a4-page doc 2 -->
+					</div>
+
+					<!-- Peer Doc Page 2: Comments & Feedback -->
+					<div v-show="peerDocPage === 2" class="a4-page" ref="peerPage2Ref" data-pdf-page>
+						<!-- School Letterhead -->
+						<header class="doc-header">
+							<div class="logo-box">
+								<img :src="depedLogo" alt="DepEd Logo" />
+							</div>
+							<div class="header-text">
+								<p class="line-sm">Republic of the Philippines</p>
+								<p class="line-md">Department of Education</p>
+								<p class="line-lg">SCHOOLS DIVISION OF OLONGAPO CITY</p>
+								<p class="line-school">JAMES L. GORDON INTEGRATED SCHOOL</p>
+							</div>
+							<div class="logo-box">
+								<img :src="bagongPinasLogo" alt="Bagong Pilipinas Logo" />
+							</div>
+						</header>
+
+						<!-- Title -->
+						<div class="report-title-section">
+							<h2>PEER / TEACHER EVALUATION COMMENTS &amp; FEEDBACK REPORT</h2>
+							<p class="subtitle">Peer Feedback &amp; Colleague Remarks &nbsp;·&nbsp; Page 2 &nbsp;·&nbsp; Generated on {{ reportDate }}</p>
+						</div>
+
+						<!-- Executive Profile & Feedback Summary Box -->
+						<div class="executive-summary-box">
+							<div class="summary-meta-grid">
+								<div class="meta-cell">
+									<span class="cell-label">Faculty Name</span>
+									<span class="cell-value font-bold">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Subject / Dept</span>
+									<span class="cell-value">{{ teacher.subject_name || 'General' }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Evaluation Period</span>
+									<span class="cell-value font-semibold">Quarter {{ teacher.quarter }} &bull; SY {{ teacher.year }}</span>
+								</div>
+								<div class="meta-cell">
+									<span class="cell-label">Comments Submitted</span>
+									<span class="cell-value font-semibold">{{ peerCommentsList.filter(c => c.feedback).length }} Feedback Submissions</span>
+								</div>
+							</div>
+
+							<div class="summary-score-callout">
+								<div class="score-callout-top">
+									<span class="callout-title">Composite Peer Score</span>
+									<span class="callout-respondents">{{ stats.peerCount }} Evaluators</span>
+								</div>
+								<div class="score-callout-number">
+									<span class="score-num">{{ stats.peerAvg ? stats.peerAvg.toFixed(2) : '0.00' }}</span>
+									<span class="score-max">/ 5.00</span>
+								</div>
+								<div class="score-callout-tier">
+									{{ getAdjectivalRating(stats.peerAvg) }}
+								</div>
+							</div>
+						</div>
+
+						<!-- Comments List Section -->
+						<section class="info-section comments-section-body">
+							<h3 class="section-heading">Peer / Teacher Feedback &amp; Qualitative Notes Register</h3>
+							<div v-if="peerCommentsList.length === 0" class="no-data-msg">
+								No peer comments or feedback recorded for this evaluation period.
+							</div>
+							<div v-else class="comments-log-container">
+								<div
+									v-for="(c, idx) in peerCommentsList"
+									:key="c.id"
+									class="comment-log-card"
+								>
+									<div class="comment-log-header">
+										<div class="comment-idx-wrap">
+											<span class="comment-idx">#{{ String(idx + 1).padStart(2, '0') }}</span>
+											<span class="comment-source-tag">Peer Evaluator</span>
+										</div>
+										<div class="comment-meta-badges">
+											<span class="comment-score-badge">
+												Rating: <strong>{{ c.avg.toFixed(2) }}</strong>
+											</span>
+											<span class="comment-sentiment-badge">
+												{{ c.sentiment }}
+											</span>
+											<span class="comment-date">{{ formatDate(c.created_at) }}</span>
+										</div>
+									</div>
+									<div class="comment-log-body">
+										<p v-if="c.feedback" class="comment-text">"{{ c.feedback }}"</p>
+										<p v-else class="comment-empty-text">(No additional written remarks provided.)</p>
+									</div>
+								</div>
+							</div>
+						</section>
+
+						<!-- Page Flip CTA -->
+						<div class="page-flip-row no-print">
+							<button type="button" @click="peerDocPage = 1" class="btn-page-flip btn-prev">
+								<ChevronLeft class="h-4 w-4" />
+								<span>Back: View Ratings Breakdown (Page 1)</span>
+							</button>
+						</div>
+
+						<!-- Signatures Section -->
+						<section class="signature-section">
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Prepared By (Admin)</p>
+							</div>
+							<div class="sig-col">
+								<div class="sig-line"></div>
+								<p class="sig-label">Noted / Approved By (Principal)</p>
+							</div>
+						</section>
+
+						<!-- Document Footer -->
+						<footer class="doc-footer">
+							<div class="footer-logo">
+								<img :src="jlgisLogo" alt="JLGIS Logo" />
+							</div>
+							<div class="footer-lines">
+								<p><strong>Address:</strong> Foster St. Brgy. Kababae, Olongapo City 2200</p>
+								<p><strong>Tel. no.:</strong> (047) 222-4769 | <strong>Email:</strong> 500027@deped.gov.ph</p>
+								<p><strong>Facebook Page:</strong> depedtayojameslgordonintegratedschool</p>
+							</div>
+						</footer>
+					</div>
 				</div> <!-- /doc-column 2 -->
 			</div> <!-- /pages-row -->
 		</div> <!-- /report-content-wrapper -->
@@ -535,7 +880,7 @@ onMounted(async () => {
 								<FileText class="h-7 w-7 text-indigo-600" />
 							</div>
 							<h3 class="export-modal-title">Export Evaluation Report</h3>
-							<p class="export-modal-sub">Select which document format you want to download:</p>
+							<p class="export-modal-sub">Select which multi-page document format you want to download:</p>
 
 							<!-- Options -->
 							<div class="export-options">
@@ -549,8 +894,8 @@ onMounted(async () => {
 										<School class="h-5 w-5" />
 									</span>
 									<div class="export-opt-text">
-										<strong>Student Evaluation</strong>
-										<small>Student-to-teacher ratings &amp; category breakdown</small>
+										<strong>Student Evaluation (2 Pages)</strong>
+										<small>Page 1: Performance table &bull; Page 2: Student feedback</small>
 									</div>
 								</button>
 
@@ -564,8 +909,8 @@ onMounted(async () => {
 										<Users class="h-5 w-5" />
 									</span>
 									<div class="export-opt-text">
-										<strong>Peer / Teacher Evaluation</strong>
-										<small>Peer-to-peer ratings &amp; category breakdown</small>
+										<strong>Peer / Teacher Evaluation (2 Pages)</strong>
+										<small>Page 1: Performance table &bull; Page 2: Peer feedback</small>
 									</div>
 								</button>
 
@@ -579,8 +924,8 @@ onMounted(async () => {
 										<Layers class="h-5 w-5" />
 									</span>
 									<div class="export-opt-text">
-										<strong>Export Both Documents</strong>
-										<small>Complete two-page Legal PDF package</small>
+										<strong>Export Both Documents (4 Pages)</strong>
+										<small>Complete multi-page Legal PDF package with all ratings &amp; comments</small>
 									</div>
 								</button>
 							</div>
@@ -644,6 +989,14 @@ onMounted(async () => {
 	width: 100%;
 }
 
+/* ── Hidden elements during HTML2Canvas PDF Export ──── */
+.is-exporting .no-print,
+.is-exporting .page-flip-row,
+.is-exporting .toolbar,
+.is-exporting .page-nav-pills {
+	display: none !important;
+}
+
 /* ── Floating Action Toolbar ────────────────────────── */
 .toolbar {
 	width: fit-content;
@@ -690,19 +1043,14 @@ onMounted(async () => {
 	box-shadow: 0 4px 12px -1px rgba(79, 70, 229, 0.4);
 }
 
-.btn-back .material-icons,
-.btn-print .material-icons {
-	font-size: 1.25rem;
-}
-
 /* ── Legal Page Layout ─────────────────────────────────── */
 .a4-page {
 	width: 215.9mm;
 	min-height: 355.6mm;
 	background: #ffffff;
 	box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-	border: 1px solid #e2e8f0;
-	padding: 15mm 20mm;
+	border: 1px solid #cbd5e1;
+	padding: 15mm 18mm;
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
@@ -712,15 +1060,15 @@ onMounted(async () => {
 .doc-header {
 	display: flex;
 	align-items: center;
-	gap: 1.5rem;
-	padding-bottom: 1rem;
-	border-bottom: 3px double #0f172a;
-	margin-bottom: 1.5rem;
+	gap: 1.25rem;
+	padding-bottom: 0.85rem;
+	border-bottom: 2px solid #0f172a;
+	margin-bottom: 1.15rem;
 }
 
 .logo-box {
-	width: 4.5rem;
-	height: 4.5rem;
+	width: 4.2rem;
+	height: 4.2rem;
 	flex-shrink: 0;
 }
 .logo-box img {
@@ -739,429 +1087,458 @@ onMounted(async () => {
 	color: #0f172a;
 }
 .line-sm {
-	font-size: 0.8rem;
+	font-size: 0.78rem;
+	color: #475569;
 }
 .line-md {
-	font-size: 0.9rem;
-	font-weight: 500;
+	font-size: 0.88rem;
+	font-weight: 600;
+	color: #1e293b;
 }
 .line-lg {
-	font-size: 0.95rem;
+	font-size: 0.92rem;
 	font-weight: 700;
-	letter-spacing: 0.5px;
+	letter-spacing: 0.3px;
+	color: #0f172a;
 }
 .line-school {
 	font-size: 1.05rem;
 	font-weight: 800;
-	color: #1e3a8a !important;
-	margin-top: 2px !important;
+	letter-spacing: 0.5px;
+	color: #0f172a;
 }
 
-/* ── Report Title ───────────────────────────────────── */
+/* ── Report Title Section ──────────────────────────── */
 .report-title-section {
 	text-align: center;
-	margin-bottom: 1.5rem;
+	margin-bottom: 1.15rem;
 }
 .report-title-section h2 {
-	font-size: 1.25rem;
-	color: #1e293b;
+	margin: 0;
+	font-size: 1.1rem;
 	font-weight: 800;
-	margin: 0 0 0.25rem 0;
 	letter-spacing: 0.5px;
+	color: #0f172a;
 }
 .subtitle {
-	font-size: 0.85rem;
+	margin: 0.3rem 0 0 0;
+	font-size: 0.78rem;
 	color: #64748b;
-	margin: 0;
+	font-weight: 500;
 }
 
-/* ── Report Sections ────────────────────────────────── */
-.info-section {
-	margin-bottom: 1.75rem;
-}
-
-.section-heading {
-	font-size: 0.95rem;
-	text-transform: uppercase;
-	color: #1e3a8a;
-	border-bottom: 2px solid #e2e8f0;
-	padding-bottom: 0.35rem;
-	margin: 0 0 0.85rem 0;
-	font-weight: 700;
-	letter-spacing: 0.5px;
-}
-
-/* ── Side-by-Side Profile + Hero Grid ───────────────── */
-.profile-summary-grid {
+/* ── Executive Summary Overview Box ───────────────── */
+.executive-summary-box {
 	display: grid;
-	grid-template-columns: 1.1fr 0.9fr;
-	gap: 1.25rem;
-	margin-bottom: 1.5rem;
+	grid-template-columns: 1.35fr 0.85fr;
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	background: #ffffff;
+	margin-bottom: 1.15rem;
+	overflow: hidden;
 }
 
-.profile-card {
+.summary-meta-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	padding: 0.75rem 0.95rem;
+	gap: 0.6rem 0.85rem;
 	background: #f8fafc;
-	border: 1px solid #e2e8f0;
-	border-radius: 10px;
-	padding: 1rem 1.25rem;
+	border-right: 1px solid #cbd5e1;
+}
+
+.meta-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+.cell-label {
+	font-size: 0.65rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	color: #64748b;
+}
+.cell-value {
+	font-size: 0.78rem;
+	color: #0f172a;
+	word-break: break-word;
+	overflow-wrap: anywhere;
+	line-height: 1.25;
+}
+.font-bold {
+	font-weight: 700;
+}
+.font-semibold {
+	font-weight: 600;
+}
+
+.summary-score-callout {
+	padding: 0.75rem 1rem;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
+	align-items: center;
+	text-align: center;
+	background: #ffffff;
 }
-.card-title {
-	font-size: 0.75rem;
+.score-callout-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	margin-bottom: 0.2rem;
+}
+.callout-title {
+	font-size: 0.65rem;
+	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	font-weight: 700;
-	color: #64748b;
-	margin: 0 0 0.6rem 0;
-}
-.meta-list {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 0.5rem 1rem;
-}
-.meta-item {
-	display: flex;
-	flex-direction: column;
-	font-size: 0.8rem;
-}
-.meta-label {
-	font-size: 0.7rem;
-	color: #94a3b8;
-	font-weight: 500;
-	text-transform: uppercase;
-}
-.meta-val {
-	color: #0f172a;
-	word-break: break-word;
-}
-
-.summary-hero-card {
-	background: #ffffff;
-	border: 2px solid #bfdbfe;
-	border-radius: 10px;
-	padding: 1rem 1.25rem;
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-	box-shadow: 0 4px 6px -2px rgba(15, 23, 42, 0.03);
-}
-.hero-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-}
-.hero-title {
-	font-size: 0.75rem;
-	font-weight: 700;
 	color: #475569;
-	text-transform: uppercase;
-	letter-spacing: 0.4px;
 }
-.hero-badge {
-	font-size: 0.7rem;
-	color: #94a3b8;
-	font-weight: 500;
+.callout-respondents {
+	font-size: 0.65rem;
+	font-weight: 600;
+	color: #64748b;
+	background: #f1f5f9;
+	padding: 0.1rem 0.4rem;
+	border-radius: 4px;
 }
-.hero-body {
+.score-callout-number {
 	display: flex;
 	align-items: baseline;
-	margin: 0.3rem 0;
+	gap: 0.25rem;
+	margin: 0.15rem 0;
 }
-.hero-score {
-	font-size: 2.2rem;
-	font-weight: 800;
+.score-num {
+	font-size: 2rem;
+	font-weight: 900;
+	color: #0f172a;
 	line-height: 1;
 }
-.hero-scale {
+.score-max {
 	font-size: 0.85rem;
-	color: #94a3b8;
-	margin-left: 0.3rem;
 	font-weight: 600;
-}
-.hero-tag {
-	display: inline-block;
-	align-self: flex-start;
-	font-size: 0.725rem;
-	font-weight: 700;
-	padding: 0.2rem 0.55rem;
-	border-radius: 6px;
-	margin-bottom: 0.5rem;
-}
-.hero-progress-track {
-	height: 6px;
-	background: #e2e8f0;
-	border-radius: 3px;
-	overflow: hidden;
-	width: 100%;
-}
-.hero-progress-fill {
-	height: 100%;
-	border-radius: 3px;
-	transition: width 0.3s ease;
-}
-
-/* ── Category Breakdown Cards (Dynamic Colors & Space-Efficient) ─ */
-.cat-cards-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.65rem;
-}
-.cat-card {
-	background: #ffffff;
-	border: 1px solid #e2e8f0;
-	border-left-width: 4px;
-	border-radius: 8px;
-	padding: 0.65rem 0.85rem;
-	display: flex;
-	flex-direction: column;
-	gap: 0.4rem;
-	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-}
-.cat-card-top {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 0.75rem;
-}
-.cat-left {
-	display: flex;
-	align-items: center;
-	gap: 0.6rem;
-	flex: 1;
-	min-width: 0;
-}
-.cat-idx {
-	font-size: 0.7rem;
-	font-weight: 800;
 	color: #64748b;
-	background: #f1f5f9;
-	padding: 0.15rem 0.4rem;
-	border-radius: 4px;
-	letter-spacing: 0.5px;
-	flex-shrink: 0;
 }
-.cat-title {
-	font-size: 0.825rem;
-	font-weight: 600;
-	color: #1e293b;
-	line-height: 1.35;
-	word-break: break-word;
-}
-.cat-score-badge {
-	display: flex;
-	align-items: center;
-	gap: 0.4rem;
-	font-size: 0.75rem;
-	padding: 0.2rem 0.55rem;
-	border-radius: 6px;
-	border: 1px solid transparent;
-	flex-shrink: 0;
-}
-.cat-rating-tag {
-	font-size: 0.675rem;
-	font-weight: 600;
-	opacity: 0.85;
-	border-left: 1px solid currentColor;
-	padding-left: 0.4rem;
-	margin-left: 0.2rem;
-}
-.cat-track {
-	height: 6px;
-	background: #f1f5f9;
-	border-radius: 3px;
-	overflow: hidden;
-	width: 100%;
-}
-.cat-fill {
-	height: 100%;
-	border-radius: 3px;
-	transition: width 0.3s ease;
-}
-
-
-/* ── Page 2 gap in browser preview ─────────────────── */
-.page-2 {
-	margin-top: 2rem;
-}
-
-/* ── Category Breakdowns (legacy, still used for .no-data-msg) ─ */
-.categories-container {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 2rem;
-}
-.category-block h4 {
-	font-size: 0.85rem;
-	color: #475569;
-	margin: 0 0 0.75rem 0;
+.score-callout-tier {
+	font-size: 0.72rem;
 	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.3px;
-}
-.no-data-msg {
-	font-size: 0.8rem;
-	color: #94a3b8;
-	font-style: italic;
-}
-.category-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.75rem;
-}
-.category-row {
-	display: flex;
-	flex-direction: column;
-	gap: 0.25rem;
-}
-.category-info {
-	display: flex;
-	justify-content: space-between;
-	font-size: 0.8rem;
-}
-.category-name {
-	color: #1e293b;
-	font-weight: 500;
-	white-space: normal;
-	word-break: break-word;
-	max-width: 180px;
-}
-.category-score {
-	font-weight: 600;
-	color: #475569;
-}
-.student-bar {
-	background: #3b82f6;
-}
-.peer-bar {
-	background: #10b981;
+	color: #334155;
+	background: #f1f5f9;
+	border: 1px solid #e2e8f0;
+	padding: 0.15rem 0.6rem;
+	border-radius: 4px;
+	margin-top: 0.2rem;
 }
 
-/* ── Comments Feedback Table ────────────────────────── */
-.feedback-table-wrapper {
-	border: 1px solid #e2e8f0;
-	border-radius: 8px;
-	overflow: hidden;
+/* ── Section Headings ──────────────────────────────── */
+.info-section {
+	margin-bottom: 0.85rem;
+	flex: 1;
 }
-.report-table {
+.section-heading {
+	font-size: 0.72rem;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	color: #0f172a;
+	margin: 0 0 0.5rem 0;
+	border-bottom: 1.5px solid #0f172a;
+	padding-bottom: 0.25rem;
+}
+
+/* ── Clean Evaluation Data Table ───────────────────── */
+.eval-data-table {
 	width: 100%;
 	border-collapse: collapse;
-	font-size: 0.8rem;
+	border: 1px solid #cbd5e1;
+	font-size: 0.76rem;
 }
-.report-table th,
-.report-table td {
-	padding: 0.5rem 0.75rem;
-	text-align: left;
-	border-bottom: 1px solid #e2e8f0;
+.eval-data-table thead tr {
+	background: #0f172a;
+	color: #ffffff;
 }
-.report-table th {
-	background: #f8fafc;
-	color: #475569;
+.eval-data-table th {
+	padding: 0.5rem 0.65rem;
 	font-weight: 700;
+	font-size: 0.7rem;
 	text-transform: uppercase;
-	font-size: 0.75rem;
-	letter-spacing: 0.3px;
+	letter-spacing: 0.5px;
+	border: 1px solid #334155;
+	text-align: left;
 }
-.report-table tr:last-child td {
-	border-bottom: none;
+.eval-data-table td {
+	padding: 0.48rem 0.65rem;
+	border: 1px solid #e2e8f0;
+	color: #1e293b;
+	vertical-align: middle;
 }
-.center-text {
+.eval-data-table tbody tr:nth-child(even) {
+	background: #f8fafc;
+}
+.col-num {
+	width: 6%;
+	text-align: center;
+	font-weight: 700;
+	color: #64748b;
+}
+.col-domain {
+	width: 58%;
+	font-weight: 600;
+	color: #0f172a;
+	line-height: 1.35;
+}
+.col-score {
+	width: 18%;
+	text-align: center;
+	font-size: 0.78rem;
+}
+.score-sub {
+	font-size: 0.68rem;
+	font-weight: 500;
+	color: #64748b;
+}
+.col-rating {
+	width: 18%;
 	text-align: center;
 }
-.text-muted {
-	color: #94a3b8;
-}
-.feedback-cell {
-	line-height: 1.4;
+.rating-pill {
+	display: inline-block;
+	font-size: 0.68rem;
+	font-weight: 700;
 	color: #334155;
+	background: #f1f5f9;
+	border: 1px solid #cbd5e1;
+	padding: 0.15rem 0.45rem;
+	border-radius: 4px;
+}
+.tfoot-summary {
+	background: #f1f5f9;
+	border-top: 2px solid #0f172a;
+}
+.summary-label {
+	padding: 0.55rem 0.65rem;
+	font-size: 0.72rem;
+	letter-spacing: 0.4px;
+	color: #0f172a;
+}
+.summary-score {
+	font-size: 0.82rem;
+	color: #0f172a;
+}
+.summary-rating {
+	font-size: 0.72rem;
+	color: #0f172a;
+}
+
+/* ── Comments Log Section (Page 2) ─────────────────── */
+.comments-log-container {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: 165mm;
+	overflow-y: auto;
+	padding-right: 0.25rem;
+}
+.is-exporting .comments-log-container {
+	max-height: none !important;
+	overflow: visible !important;
+	padding-right: 0 !important;
+}
+.comment-log-card {
+	background: #ffffff;
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	padding: 0.55rem 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+.comment-log-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	border-bottom: 1px solid #f1f5f9;
+	padding-bottom: 0.25rem;
+}
+.comment-idx-wrap {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+.comment-idx {
+	font-size: 0.72rem;
+	font-weight: 800;
+	color: #0f172a;
+}
+.comment-source-tag {
+	font-size: 0.65rem;
+	font-weight: 700;
+	color: #475569;
+	background: #f1f5f9;
+	border: 1px solid #e2e8f0;
+	padding: 0.1rem 0.4rem;
+	border-radius: 3px;
+}
+.comment-meta-badges {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.comment-score-badge {
+	font-size: 0.68rem;
+	font-weight: 600;
+	color: #334155;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	padding: 0.1rem 0.4rem;
+	border-radius: 3px;
+}
+.comment-score-badge strong {
+	font-weight: 800;
+	color: #0f172a;
+}
+.comment-sentiment-badge {
+	font-size: 0.65rem;
+	font-weight: 700;
+	color: #334155;
+	background: #f1f5f9;
+	border: 1px solid #e2e8f0;
+	padding: 0.1rem 0.4rem;
+	border-radius: 3px;
+}
+.comment-date {
+	font-size: 0.68rem;
+	color: #64748b;
+	font-weight: 500;
+	white-space: nowrap;
+}
+.comment-log-body {
+	padding-left: 0.5rem;
+	border-left: 2.5px solid #cbd5e1;
+	margin: 0.15rem 0;
+}
+.comment-text {
+	margin: 0;
+	font-size: 0.76rem;
+	line-height: 1.4;
+	color: #1e293b;
+	font-style: italic;
+	word-break: break-word;
+	overflow-wrap: break-word;
+}
+.comment-empty-text {
+	margin: 0;
+	font-size: 0.72rem;
+	color: #94a3b8;
 	font-style: italic;
 }
 
-/* Sentiment badges */
-.sentiment-badge {
-	display: inline-block;
-	font-size: 0.7rem;
+/* ── Page Flip CTA ─────────────────────────────────── */
+.page-flip-row {
+	display: flex;
+	justify-content: center;
+	margin-top: 0.75rem;
+	margin-bottom: 0.75rem;
+}
+.btn-page-flip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	background: #ffffff;
+	border: 1px solid #cbd5e1;
+	color: #334155;
+	padding: 0.4rem 0.9rem;
+	border-radius: 6px;
+	font-size: 0.76rem;
 	font-weight: 600;
-	padding: 0.15rem 0.4rem;
-	border-radius: 4px;
-	text-transform: uppercase;
+	cursor: pointer;
+	transition: all 0.15s;
 }
-.sentiment-positive {
-	background: #dcfce7;
-	color: #166534;
-	border: 1px solid #bbf7d0;
+.btn-page-flip:hover {
+	background: #f8fafc;
+	border-color: #94a3b8;
+	color: #0f172a;
 }
-.sentiment-negative {
-	background: #fee2e2;
-	color: #991b1b;
-	border: 1px solid #fecaca;
-}
-.sentiment-neutral {
-	background: #f1f5f9;
+.btn-page-flip.btn-prev {
 	color: #475569;
-	border: 1px solid #e2e8f0;
 }
 
-/* ── Signatures Section ──────────────────────────────── */
+.no-data-msg {
+	text-align: center;
+	padding: 1.5rem;
+	color: #94a3b8;
+	font-size: 0.85rem;
+	background: #f8fafc;
+	border-radius: 6px;
+	border: 1px dashed #cbd5e1;
+}
+
+/* ── Signatures Section ────────────────────────────── */
 .signature-section {
-	margin-top: auto;
-	padding-top: 3.5rem;
 	display: flex;
 	justify-content: space-between;
-	margin-bottom: 2rem;
+	margin-top: auto;
+	padding-top: 1.25rem;
 }
 .sig-col {
-	width: 40%;
+	width: 42%;
 	text-align: center;
 }
 .sig-line {
-	border-bottom: 1px solid #0f172a;
-	margin-bottom: 0.5rem;
+	border-bottom: 1.5px solid #0f172a;
+	margin-bottom: 0.35rem;
 }
 .sig-label {
-	font-size: 0.8rem;
-	color: #475569;
 	margin: 0;
-	font-weight: 500;
+	font-size: 0.76rem;
+	font-weight: 700;
+	color: #0f172a;
 }
 
-/* ── Document Footer ────────────────────────────────── */
+/* ── Document Footer ───────────────────────────────── */
 .doc-footer {
 	display: flex;
 	align-items: center;
-	gap: 1.5rem;
-	padding-top: 0.75rem;
-	border-top: 2px solid #0f172a;
-	margin-top: 1rem;
+	gap: 1rem;
+	border-top: 1px solid #cbd5e1;
+	padding-top: 0.65rem;
+	margin-top: 0.85rem;
 }
 .footer-logo {
-	width: 3.2rem;
+	width: 2.2rem;
+	height: 2.2rem;
 	flex-shrink: 0;
 }
 .footer-logo img {
 	width: 100%;
+	height: 100%;
 	object-fit: contain;
 }
+.footer-lines {
+	flex: 1;
+}
 .footer-lines p {
-	font-size: 0.65rem;
-	line-height: 1.35;
-	color: #64748b;
 	margin: 0;
+	font-size: 0.64rem;
+	line-height: 1.35;
+	color: #475569;
 }
 
-/* ── Loading Screen ─────────────────────────────────── */
+/* ── Loading / Error States ────────────────────────── */
 .loading-state,
 .error-state {
+	min-height: 80vh;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	min-height: 50vh;
 }
 .spinner {
-	width: 2.5rem;
-	height: 2.5rem;
+	width: 3rem;
+	height: 3rem;
 	border: 3px solid #e2e8f0;
 	border-top-color: #4f46e5;
 	border-radius: 50%;
@@ -1174,332 +1551,241 @@ onMounted(async () => {
 
 .error-card {
 	background: white;
-	padding: 2rem;
+	padding: 2rem 3rem;
 	border-radius: 12px;
 	box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 	text-align: center;
 	max-width: 400px;
 }
-.error-card h3 {
-	color: #dc2626;
-	margin: 0 0 0.5rem 0;
-}
-.error-card p {
-	color: #64748b;
-	font-size: 0.875rem;
-	margin-bottom: 1.5rem;
-}
 .btn-retry {
 	background: #4f46e5;
 	color: white;
 	border: none;
-	padding: 0.5rem 1.25rem;
+	padding: 0.5rem 1rem;
 	border-radius: 6px;
-	font-weight: 500;
+	font-weight: 600;
 	cursor: pointer;
-	margin-right: 0.75rem;
+	margin-top: 1rem;
+	display: inline-block;
 }
 .btn-link-back {
-	color: #4f46e5;
+	display: block;
+	margin-top: 0.75rem;
+	color: #64748b;
+	font-size: 0.85rem;
 	text-decoration: none;
-	font-size: 0.875rem;
 }
 
-/* ── Side-by-side page layout ───────────────────── */
+/* ── Two Document Columns Side by Side ─────────────── */
 .pages-row {
 	display: flex;
 	flex-direction: row;
+	gap: 2rem;
 	align-items: flex-start;
-	gap: 2.5rem;
-	overflow-x: auto;
-	padding-bottom: 2rem;
+	justify-content: center;
+	width: 100%;
 }
 .doc-column {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	flex-shrink: 0;
 }
+
 .doc-label {
+	width: 215.9mm;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.75rem;
+	padding: 0 0.5rem;
+	box-sizing: border-box;
+}
+.doc-label-left {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
-	font-size: 0.8rem;
 	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	padding: 0.35rem 0.75rem;
-	border-radius: 20px;
-	margin-bottom: 0.75rem;
+	font-size: 0.88rem;
 }
-.student-label {
-	background: #eff6ff;
+.student-label .doc-label-left {
 	color: #1d4ed8;
 }
-.peer-label {
-	background: #f0fdf4;
-	color: #15803d;
+.peer-label .doc-label-left {
+	color: #047857;
 }
 .doc-label-dot {
 	width: 8px;
 	height: 8px;
 	border-radius: 50%;
-	flex-shrink: 0;
+	display: inline-block;
 }
 
-/* Remove old page-2 margin-top since we're side by side */
-.page-2 {
-	margin-top: 0;
+.page-nav-pills {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	padding: 0.2rem;
+	border-radius: 9999px;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.page-nav-btn {
+	border: none;
+	background: transparent;
+	padding: 0.3rem 0.75rem;
+	border-radius: 9999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: #64748b;
+	cursor: pointer;
+	transition: all 0.15s ease-in-out;
+}
+.page-nav-btn:hover {
+	color: #1e293b;
+	background: #f1f5f9;
+}
+.student-label .page-nav-btn.active {
+	background: #2563eb;
+	color: #ffffff;
+	box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+.peer-label .page-nav-btn.active {
+	background: #059669;
+	color: #ffffff;
+	box-shadow: 0 1px 3px rgba(5, 150, 105, 0.3);
 }
 
-/* ── Export Choice Modal ────────────────────────── */
+/* ── Export Modal ──────────────────────────────────── */
 .export-modal-backdrop {
 	position: fixed;
 	inset: 0;
-	z-index: 9999;
-	background: rgba(15, 23, 42, 0.6);
+	background: rgba(15, 23, 42, 0.55);
 	backdrop-filter: blur(4px);
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	z-index: 9999;
 	padding: 1rem;
 }
 .export-modal-card {
 	position: relative;
 	background: #ffffff;
-	border: 1px solid #e2e8f0;
-	border-radius: 1.25rem;
-	box-shadow: 0 32px 64px -16px rgba(2, 6, 23, 0.45);
+	border-radius: 16px;
 	padding: 2rem;
+	max-width: 480px;
 	width: 100%;
-	max-width: 440px;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+	box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 	text-align: center;
-	font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 .export-modal-close {
 	position: absolute;
-	top: 1.25rem;
-	right: 1.25rem;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
+	top: 1rem;
+	right: 1rem;
+	background: #f1f5f9;
+	border: none;
+	border-radius: 50%;
 	width: 2rem;
 	height: 2rem;
-	border-radius: 0.5rem;
-	border: 1px solid #e2e8f0;
-	background: #ffffff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	color: #64748b;
 	cursor: pointer;
-	transition: all 0.15s ease;
+	transition: background 0.15s, color 0.15s;
 }
 .export-modal-close:hover {
-	background: #f8fafc;
+	background: #e2e8f0;
 	color: #0f172a;
 }
 .export-modal-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	width: 3.5rem;
 	height: 3.5rem;
-	border-radius: 1rem;
-	background: #eef2ff;
-	margin-bottom: 1rem;
+	background: #e0e7ff;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0 auto 1rem;
 }
 .export-modal-title {
-	font-size: 1.25rem;
+	margin: 0 0 0.35rem;
+	font-size: 1.2rem;
 	font-weight: 800;
 	color: #0f172a;
-	margin: 0 0 0.35rem 0;
-	letter-spacing: -0.02em;
 }
 .export-modal-sub {
-	font-size: 0.875rem;
-	color: #475569;
-	margin: 0 0 1.5rem 0;
+	margin: 0 0 1.5rem;
+	font-size: 0.85rem;
+	color: #64748b;
 }
 .export-options {
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
-	width: 100%;
 	margin-bottom: 1.25rem;
 }
 .export-option {
 	display: flex;
 	align-items: center;
 	gap: 1rem;
-	padding: 0.875rem 1.25rem;
-	border-radius: 0.875rem;
-	border: 1.5px solid transparent;
+	padding: 0.85rem 1rem;
+	border-radius: 10px;
+	border: 1.5px solid #e2e8f0;
+	background: #ffffff;
 	cursor: pointer;
 	text-align: left;
-	transition: all 0.15s ease;
-	font-family: inherit;
+	transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.export-option:hover:not(:disabled) {
+	transform: translateY(-1px);
 }
 .export-option:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
+.student-opt:hover:not(:disabled) {
+	border-color: #3b82f6;
+	background: #eff6ff;
+}
+.peer-opt:hover:not(:disabled) {
+	border-color: #10b981;
+	background: #ecfdf5;
+}
+.both-opt:hover:not(:disabled) {
+	border-color: #6366f1;
+	background: #eef2ff;
+}
 .export-opt-icon-wrap {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 	width: 2.5rem;
 	height: 2.5rem;
-	border-radius: 0.75rem;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
 }
-.export-opt-text {
-	display: flex;
-	flex-direction: column;
-	gap: 0.1rem;
-}
 .export-opt-text strong {
+	display: block;
 	font-size: 0.9rem;
-	font-weight: 700;
 	color: #0f172a;
 }
 .export-opt-text small {
+	display: block;
 	font-size: 0.75rem;
 	color: #64748b;
-}
-.student-opt {
-	background: #f8fafc;
-	border-color: #e2e8f0;
-}
-.student-opt:hover:not(:disabled) {
-	background: #eff6ff;
-	border-color: #bfdbfe;
-}
-.peer-opt {
-	background: #f8fafc;
-	border-color: #e2e8f0;
-}
-.peer-opt:hover:not(:disabled) {
-	background: #f0fdf4;
-	border-color: #bbf7d0;
-}
-.both-opt {
-	background: #f8fafc;
-	border-color: #e2e8f0;
-}
-.both-opt:hover:not(:disabled) {
-	background: #eef2ff;
-	border-color: #c7d2fe;
+	margin-top: 0.15rem;
 }
 .export-cancel {
-	width: 100%;
-	padding: 0.65rem;
-	border-radius: 0.75rem;
-	border: 1px solid #e2e8f0;
-	background: #ffffff;
-	color: #475569;
-	font-size: 0.875rem;
-	font-weight: 700;
+	background: transparent;
+	border: none;
+	color: #94a3b8;
+	font-size: 0.85rem;
 	cursor: pointer;
-	transition: background 0.15s;
-	font-family: inherit;
-}
-.export-cancel:hover {
-	background: #f8fafc;
-	color: #0f172a;
-}
-
-/* ── Skeleton Loaders ────────────────────────── */
-@keyframes shimmer {
-	0% { opacity: 0.45; }
-	50% { opacity: 0.85; }
-	100% { opacity: 0.45; }
-}
-
-.report-skeleton-wrapper {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	width: 100%;
-	animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.toolbar-sk {
-	width: fit-content;
-	min-width: 472mm;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	background: #ffffff;
-	padding: 1rem 1.5rem;
-	border-radius: 12px;
-	margin-bottom: 1.5rem;
-	border: 1px solid #e2e8f0;
-}
-
-.sk-page {
-	background: #ffffff !important;
-	border: 1px solid #e2e8f0 !important;
-}
-
-.sk-pill {
-	height: 1.5rem;
-	background: #e2e8f0;
-	border-radius: 999px;
-}
-.sk-w-28 { width: 7rem; }
-.sk-w-32 { width: 8rem; }
-.sk-w-36 { width: 9rem; }
-.sk-w-40 { width: 10rem; }
-.sk-w-44 { width: 11rem; }
-.sk-w-50 { width: 12.5rem; }
-.sk-w-60 { width: 15rem; }
-.sk-w-70 { width: 17.5rem; }
-.sk-w-80 { width: 20rem; }
-.sk-w-90 { width: 22.5rem; }
-
-.sk-h-5 { height: 1.25rem; }
-.sk-h-6 { height: 1.5rem; }
-.sk-h-16 { height: 4rem; }
-.sk-h-32 { height: 8rem; }
-
-.sk-header {
-	display: flex;
-	align-items: center;
-	gap: 1.5rem;
-	padding-bottom: 1rem;
-	border-bottom: 2px solid #e2e8f0;
-	margin-bottom: 1.5rem;
-}
-.sk-logo {
-	width: 4.5rem;
-	height: 4.5rem;
-	background: #e2e8f0;
-	border-radius: 50%;
-	flex-shrink: 0;
-}
-.sk-header-lines {
-	flex: 1;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 0.5rem;
-}
-.sk-line {
-	height: 0.75rem;
-	background: #e2e8f0;
+	padding: 0.25rem 0.5rem;
 	border-radius: 4px;
 }
-.sk-title-block {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 0.5rem;
-	margin-bottom: 1.5rem;
-}
-.sk-card {
-	background: #f8fafc;
-	border: 1px solid #e2e8f0;
-	border-radius: 10px;
+.export-cancel:hover {
+	color: #475569;
 }
 </style>
