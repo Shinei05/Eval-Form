@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive, ArrowUpDown } from '@lucide/vue';
+import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive, ArrowUpDown, MessageSquare } from '@lucide/vue';
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import AppToast from "../../components/AppToast.vue";
@@ -254,6 +254,16 @@ function goToEvaluator(ev) {
 			params: { id: ev.eval_id, tcrid: e.teacher_id, evtid: ev.evaluator_id },
 		});
 	}
+}
+
+function viewComments() {
+	if (!selectedEval.value) return;
+	const teacher = selectedEval.value;
+	router.push({
+		name: "teacher-comments",
+		params: { tcrid: teacher.teacher_id },
+		query: { type: detailType.value || "all" }
+	});
 }
 
 function viewPerformance() {
@@ -523,6 +533,13 @@ onUnmounted(() => {
             >
               <Download class="h-4 w-4" />
               Export PDF
+            </button>
+            <button
+              @click="viewComments"
+              class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 sm:w-auto"
+            >
+              <MessageSquare class="h-4 w-4" />
+              Comments
             </button>
             <button
               @click="viewPerformance"

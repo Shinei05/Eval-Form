@@ -223,6 +223,12 @@ const routes = [
 		component: () => import("../views/admin/ExportReport.vue"),
 		meta: { title: "Teacher Summary Report", requiresAuth: true },
 	},
+	{
+		path: "/admin/comments/:tcrid",
+		name: "teacher-comments",
+		component: () => import("../views/admin/TeacherComments.vue"),
+		meta: { title: "Teacher Comments & Feedback", requiresAuth: true },
+	},
 
 	// ── Performance graphs ──────────────────────────────
 	{
