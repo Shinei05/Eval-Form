@@ -141,6 +141,18 @@
               Hide Evaluated
             </button>
 
+            <!-- Grade Filter -->
+            <div class="relative flex-1 sm:flex-none min-w-[140px]">
+              <label htmlFor="teacher-grade-filter" class="sr-only">Filter by Grade Level</label>
+              <select
+                id="teacher-grade-filter"
+                v-model="gradeFilter"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 px-3 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option v-for="opt in GRADE_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
             <!-- Subject Filter -->
             <div class="relative flex-1 sm:flex-none min-w-[120px]">
               <label htmlFor="subject-filter" class="sr-only">Filter by Subject</label>
@@ -221,6 +233,7 @@ import {
   TriangleAlert,
   UsersRound,
   LayoutDashboard,
+  GraduationCap,
 } from '@lucide/vue'
 import StatCard from '../../components/dashboard/StatCard.vue'
 import TeacherCard from '../../components/dashboard/TeacherCard.vue'
@@ -229,6 +242,7 @@ import Pagination from "../../components/Pagination.vue";
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import API from "../../utils/api";
+import { GRADE_FILTER_OPTIONS } from "../../utils/academic";
 
 const router = useRouter();
 const { request } = useApi();
@@ -250,6 +264,7 @@ const schoolYear = ref("");
 const searchQuery = ref("");
 const sortBy = ref("name");
 const subjectFilter = ref("");
+const gradeFilter = ref("all");
 const hideEvaluated = ref(false);
 
 const currentPage = ref(1);
@@ -262,7 +277,7 @@ function goToPage(page) {
 	currentPage.value = Math.max(1, Math.min(page, totalPages.value));
 }
 
-watch([searchQuery, subjectFilter, hideEvaluated, sortBy], () => {
+watch([searchQuery, subjectFilter, gradeFilter, hideEvaluated, sortBy], () => {
 	currentPage.value = 1;
 	fetchTeachers();
 });
@@ -280,6 +295,7 @@ async function fetchTeachers() {
 			perPage,
 			search: searchQuery.value,
 			subject: subjectFilter.value,
+			grade: gradeFilter.value,
 			sortBy: sortBy.value,
 			hideEvaluated: hideEvaluated.value,
 		},

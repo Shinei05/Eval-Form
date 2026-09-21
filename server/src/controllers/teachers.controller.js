@@ -19,7 +19,7 @@ export async function listTeachers(req, res) {
 
 			const { rows: teachers } = await pool.query(
 				`SELECT DISTINCT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id,
-				    u.email, s.subjects AS subject_name, st.section
+				    u.email, s.subjects AS subject_name, st.section, t.is_elementary, t.is_jhs
 			     FROM student_teacher st
 			     JOIN teachers t ON t.id = st.teacher_id
 			     JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL)
@@ -43,6 +43,8 @@ export async function listTeachers(req, res) {
 				subject: t.subject_name || null,
 				quarter: t.quarter,
 				year: t.year,
+				is_elementary: Boolean(t.is_elementary),
+				is_jhs: Boolean(t.is_jhs),
 				evaluated: evalSet.has(t.id) ? "evaluated" : "not evaluated",
 			}));
 
@@ -58,6 +60,7 @@ export async function listTeachers(req, res) {
 		const offset = (page - 1) * perPage;
 		const search = String(req.body.search || "").trim().toLowerCase();
 		const subject = String(req.body.subject || "").trim();
+		const gradeFilter = String(req.body.grade || req.body.gradeFilter || "").trim().toLowerCase();
 		const sortBy = String(req.body.sortBy || "name").trim();
 		const showEvaluated = req.body.showEvaluated !== false;
 
@@ -93,6 +96,21 @@ export async function listTeachers(req, res) {
 			where.push(`s.subjects = ${subjectParam}`);
 		}
 
+		if (gradeFilter && gradeFilter !== "all") {
+			if (gradeFilter === "elementary" || gradeFilter === "elem") {
+				where.push("t.is_elementary = true");
+			} else if (gradeFilter === "jhs" || gradeFilter === "junior") {
+				where.push("t.is_jhs = true");
+			} else {
+				const num = parseInt(gradeFilter.replace(/\D/g, ""), 10);
+				if (num >= 4 && num <= 6) {
+					where.push("t.is_elementary = true");
+				} else if (num >= 7 && num <= 10) {
+					where.push("t.is_jhs = true");
+				}
+			}
+		}
+
 		if (!showEvaluated) {
 			where.push("ev.tcr_id IS NULL");
 		}
@@ -119,7 +137,7 @@ export async function listTeachers(req, res) {
 		const limitParam = addDataParam(perPage);
 		const offsetParam = addDataParam(offset);
 
-		const dataSql = `SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email, s.subjects AS subject_name, CASE WHEN ev.tcr_id IS NULL THEN 'not evaluated' ELSE 'evaluated' END AS evaluated ${fromSql} ${whereSql} ${orderSql} LIMIT ${limitParam} OFFSET ${offsetParam}`;
+		const dataSql = `SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email, s.subjects AS subject_name, t.is_elementary, t.is_jhs, CASE WHEN ev.tcr_id IS NULL THEN 'not evaluated' ELSE 'evaluated' END AS evaluated ${fromSql} ${whereSql} ${orderSql} LIMIT ${limitParam} OFFSET ${offsetParam}`;
 		const { rows: teachers } = await pool.query(dataSql, dataParams);
 
 		const result = teachers.map((t) => ({
@@ -130,6 +148,8 @@ export async function listTeachers(req, res) {
 			subject: t.subject_name || null,
 			quarter: t.quarter,
 			year: t.year,
+			is_elementary: Boolean(t.is_elementary),
+			is_jhs: Boolean(t.is_jhs),
 			evaluated: t.evaluated,
 		}));
 
@@ -177,7 +197,7 @@ export async function listTeachersFaculty(req, res) {
 			// Original non-paged behavior
 			const { rows: teachers } = await pool.query(
 				`SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email,
-			    s.subjects AS subject_name
+			    s.subjects AS subject_name, t.is_elementary, t.is_jhs
 			 FROM teachers t
 			 JOIN users u ON u.id = t.usr_id AND u.is_deleted = false AND (u.is_admin IS FALSE OR u.is_admin IS NULL)
 			 LEFT JOIN subjects s ON s.id = t.subject`,
@@ -207,6 +227,8 @@ export async function listTeachersFaculty(req, res) {
 				subject_id: t.subject || null,
 				quarter: t.quarter,
 				year: t.year,
+				is_elementary: Boolean(t.is_elementary),
+				is_jhs: Boolean(t.is_jhs),
 				evaluated: evalSet.has(t.id) ? "evaluated" : "not evaluated",
 			}));
 
@@ -234,6 +256,7 @@ export async function listTeachersFaculty(req, res) {
 		const offset = (page - 1) * perPage;
 		const search = String(req.body.search || "").trim().toLowerCase();
 		const subjectId = String(req.body.subject || "").trim();
+		const gradeFilter = String(req.body.grade || req.body.gradeFilter || "").trim().toLowerCase();
 		const sortBy = String(req.body.sortBy || "name").trim();
 		const hideEvaluated = req.body.hideEvaluated === true;
 
@@ -271,6 +294,21 @@ export async function listTeachersFaculty(req, res) {
 			where.push(`t.subject = ${subjectParam}`);
 		}
 
+		if (gradeFilter && gradeFilter !== "all") {
+			if (gradeFilter === "elementary" || gradeFilter === "elem") {
+				where.push("t.is_elementary = true");
+			} else if (gradeFilter === "jhs" || gradeFilter === "junior") {
+				where.push("t.is_jhs = true");
+			} else {
+				const num = parseInt(gradeFilter.replace(/\D/g, ""), 10);
+				if (num >= 4 && num <= 6) {
+					where.push("t.is_elementary = true");
+				} else if (num >= 7 && num <= 10) {
+					where.push("t.is_jhs = true");
+				}
+			}
+		}
+
 		if (hideEvaluated) {
 			where.push("ev.tcr_id IS NULL");
 		}
@@ -299,7 +337,7 @@ export async function listTeachersFaculty(req, res) {
 		const limitParam = addDataParam(perPage);
 		const offsetParam = addDataParam(offset);
 
-		const dataSql = `SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email, s.subjects AS subject_name, CASE WHEN ev.tcr_id IS NULL THEN 'not evaluated' ELSE 'evaluated' END AS evaluated ${fromSql} ${whereSql} ${orderSql} LIMIT ${limitParam} OFFSET ${offsetParam}`;
+		const dataSql = `SELECT t.id, t.firstname, t.lastname, t.subject, t.quarter, t.year, t.usr_id, u.email, s.subjects AS subject_name, t.is_elementary, t.is_jhs, CASE WHEN ev.tcr_id IS NULL THEN 'not evaluated' ELSE 'evaluated' END AS evaluated ${fromSql} ${whereSql} ${orderSql} LIMIT ${limitParam} OFFSET ${offsetParam}`;
 		const { rows: teachers } = await pool.query(dataSql, dataParams);
 
 		const result = teachers.map((t) => ({
@@ -311,6 +349,8 @@ export async function listTeachersFaculty(req, res) {
 			subject_id: t.subject || null,
 			quarter: t.quarter,
 			year: t.year,
+			is_elementary: Boolean(t.is_elementary),
+			is_jhs: Boolean(t.is_jhs),
 			evaluated: t.evaluated,
 		}));
 

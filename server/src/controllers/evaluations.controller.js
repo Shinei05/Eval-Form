@@ -343,7 +343,7 @@ export async function viewStudentEvaluations(req, res) {
 			const teacherIds = [...new Set(evals.map((e) => e.tcr_id))];
 
 			const { rows: teachers } = await pool.query(
-				`SELECT id, firstname, lastname, quarter, year, subject FROM teachers WHERE id = ANY($1::int[])`,
+				`SELECT id, firstname, lastname, quarter, year, subject, is_elementary, is_jhs FROM teachers WHERE id = ANY($1::int[])`,
 				[teacherIds],
 			);
 
@@ -364,6 +364,8 @@ export async function viewStudentEvaluations(req, res) {
 					quarter: t.quarter,
 					year: t.year,
 					subject: subjectMap[t.subject] || null,
+					is_elementary: Boolean(t.is_elementary),
+					is_jhs: Boolean(t.is_jhs),
 				};
 			}
 
@@ -416,11 +418,13 @@ export async function viewStudentEvaluations(req, res) {
 	        t.lastname,
 	        t.quarter,
 	        t.year,
+	        t.is_elementary,
+	        t.is_jhs,
 	        s.subjects AS subject
 	       FROM evaluation e
 	       JOIN teachers t ON t.id = e.tcr_id
 	       LEFT JOIN subjects s ON s.id = t.subject
-	       GROUP BY e.tcr_id, t.firstname, t.lastname, t.quarter, t.year, s.subjects
+	       GROUP BY e.tcr_id, t.firstname, t.lastname, t.quarter, t.year, t.is_elementary, t.is_jhs, s.subjects
 	       ORDER BY t.lastname, t.firstname
 	       LIMIT $1 OFFSET $2`,
 			[perPage, offset],
@@ -435,6 +439,8 @@ export async function viewStudentEvaluations(req, res) {
 				quarter: r.quarter,
 				year: r.year,
 				subject: r.subject || null,
+				is_elementary: Boolean(r.is_elementary),
+				is_jhs: Boolean(r.is_jhs),
 				sentiment: getSentiment(Number(r.avg_score) || 0),
 			},
 		}));
@@ -465,7 +471,7 @@ export async function viewTeacherEvaluations(req, res) {
 			const teacherIds = [...new Set(evals.map((e) => e.tcr_id))];
 
 			const { rows: teachers } = await pool.query(
-				`SELECT id, firstname, lastname, quarter, year, subject FROM teachers WHERE id = ANY($1::int[])`,
+				`SELECT id, firstname, lastname, quarter, year, subject, is_elementary, is_jhs FROM teachers WHERE id = ANY($1::int[])`,
 				[teacherIds],
 			);
 
@@ -484,6 +490,8 @@ export async function viewTeacherEvaluations(req, res) {
 					quarter: t.quarter,
 					year: t.year,
 					subject: t.subject || null,
+					is_elementary: Boolean(t.is_elementary),
+					is_jhs: Boolean(t.is_jhs),
 				};
 			}
 
@@ -529,11 +537,13 @@ export async function viewTeacherEvaluations(req, res) {
 	        t.lastname,
 	        t.quarter,
 	        t.year,
+	        t.is_elementary,
+	        t.is_jhs,
 	        s.subjects AS subject
 	       FROM evaluation_p e
 	       JOIN teachers t ON t.id = e.tcr_id
 	       LEFT JOIN subjects s ON s.id = t.subject
-	       GROUP BY e.tcr_id, t.firstname, t.lastname, t.quarter, t.year, s.subjects
+	       GROUP BY e.tcr_id, t.firstname, t.lastname, t.quarter, t.year, t.is_elementary, t.is_jhs, s.subjects
 	       ORDER BY t.lastname, t.firstname
 	       LIMIT $1 OFFSET $2`,
 			[perPage, offset],
@@ -548,6 +558,8 @@ export async function viewTeacherEvaluations(req, res) {
 				quarter: r.quarter,
 				year: r.year,
 				subject: r.subject || null,
+				is_elementary: Boolean(r.is_elementary),
+				is_jhs: Boolean(r.is_jhs),
 				sentiment: getSentiment(Number(r.avg_score) || 0),
 			},
 		}));

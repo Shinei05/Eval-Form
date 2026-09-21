@@ -4,6 +4,9 @@ import {
   formatGradeSection,
   formatTeacherAssignedGrade,
   formatActiveTerm,
+  matchesGradeFilter,
+  getTeacherGradeBadge,
+  GRADE_FILTER_OPTIONS,
 } from "../src/utils/academic.js";
 
 describe("academic utility helpers", () => {
@@ -79,4 +82,63 @@ describe("academic utility helpers", () => {
       expect(formatActiveTerm(null, null)).toBeNull();
     });
   });
+
+  describe("matchesGradeFilter", () => {
+    const elemTeacher = { firstname: "Maria", lastname: "Santos", is_elementary: true, is_jhs: false };
+    const jhsTeacher = { firstname: "Juan", lastname: "Cruz", is_elementary: false, is_jhs: true };
+    const bothTeacher = { firstname: "Ana", lastname: "Reyes", is_elementary: true, is_jhs: true };
+    const specificGradeTeacher = { firstname: "Pedro", lastname: "Gomez", grade: "8", is_elementary: false, is_jhs: false };
+
+    it("returns true for 'all' or empty filter", () => {
+      expect(matchesGradeFilter(elemTeacher, "all")).toBe(true);
+      expect(matchesGradeFilter(jhsTeacher, "")).toBe(true);
+      expect(matchesGradeFilter(bothTeacher, null)).toBe(true);
+    });
+
+    it("filters elementary teachers correctly", () => {
+      expect(matchesGradeFilter(elemTeacher, "elementary")).toBe(true);
+      expect(matchesGradeFilter(jhsTeacher, "elementary")).toBe(false);
+      expect(matchesGradeFilter(bothTeacher, "elementary")).toBe(true);
+    });
+
+    it("filters JHS teachers correctly", () => {
+      expect(matchesGradeFilter(elemTeacher, "jhs")).toBe(false);
+      expect(matchesGradeFilter(jhsTeacher, "jhs")).toBe(true);
+      expect(matchesGradeFilter(bothTeacher, "jhs")).toBe(true);
+    });
+
+    it("filters specific grades correctly", () => {
+      expect(matchesGradeFilter(elemTeacher, "4")).toBe(true);
+      expect(matchesGradeFilter(elemTeacher, "5")).toBe(true);
+      expect(matchesGradeFilter(elemTeacher, "7")).toBe(false);
+
+      expect(matchesGradeFilter(jhsTeacher, "7")).toBe(true);
+      expect(matchesGradeFilter(jhsTeacher, "8")).toBe(true);
+      expect(matchesGradeFilter(jhsTeacher, "10")).toBe(true);
+      expect(matchesGradeFilter(jhsTeacher, "5")).toBe(false);
+
+      expect(matchesGradeFilter(specificGradeTeacher, "8")).toBe(true);
+      expect(matchesGradeFilter(specificGradeTeacher, "9")).toBe(false);
+    });
+  });
+
+  describe("getTeacherGradeBadge", () => {
+    it("returns correct badge text based on teacher level", () => {
+      expect(getTeacherGradeBadge({ is_elementary: true, is_jhs: false })).toBe("Elementary (Grades 4–6)");
+      expect(getTeacherGradeBadge({ is_elementary: false, is_jhs: true })).toBe("Junior High (Grades 7–10)");
+      expect(getTeacherGradeBadge({ is_elementary: true, is_jhs: true })).toBe("Elem & JHS");
+      expect(getTeacherGradeBadge({ grade: "10" })).toBe("Grade 10");
+      expect(getTeacherGradeBadge({})).toBeNull();
+      expect(getTeacherGradeBadge(null)).toBeNull();
+    });
+  });
+
+  describe("GRADE_FILTER_OPTIONS", () => {
+    it("has valid filter options array", () => {
+      expect(Array.isArray(GRADE_FILTER_OPTIONS)).toBe(true);
+      expect(GRADE_FILTER_OPTIONS.length).toBeGreaterThan(5);
+      expect(GRADE_FILTER_OPTIONS[0].value).toBe("all");
+    });
+  });
 });
+

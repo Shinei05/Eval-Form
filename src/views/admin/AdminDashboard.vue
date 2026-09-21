@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive, ArrowUpDown, MessageSquare } from '@lucide/vue';
+import { UsersRound, CheckCircle2, ClipboardList, Search, EyeOff, BookOpen, Clock, Calendar, BarChart, BookType, X, MoreHorizontal, User, FileText, ChevronDown, ChevronUp, Download, Eye, RefreshCw, LayoutDashboard, Archive, ArrowUpDown, MessageSquare, GraduationCap } from '@lucide/vue';
 import { useApi } from "../../composables/useApi";
 import { useAuth } from "../../composables/useAuth";
 import AppToast from "../../components/AppToast.vue";
@@ -11,6 +11,7 @@ import Pagination from "../../components/Pagination.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { matchesGradeFilter, getTeacherGradeBadge, GRADE_FILTER_OPTIONS } from "../../utils/academic";
 
 const router = useRouter();
 const route = useRoute();
@@ -50,6 +51,7 @@ const adminFullName = computed(() => {
 
 // Search & Filter state for Student Evaluations tab
 const studentSearch = ref("");
+const studentGrade = ref("all");
 const studentSortBy = ref("name"); // 'name' | 'subject' | 'evals'
 
 const filteredStudentEvals = computed(() => {
@@ -61,6 +63,9 @@ const filteredStudentEvals = computed(() => {
 			const subj = (e.subject || '').toLowerCase();
 			return name.includes(q) || subj.includes(q);
 		});
+	}
+	if (studentGrade.value && studentGrade.value !== "all") {
+		list = list.filter((e) => matchesGradeFilter(e, studentGrade.value));
 	}
 	if (studentSortBy.value === "name") {
 		list.sort((a, b) => (a.lastname || "").localeCompare(b.lastname || ""));
@@ -74,6 +79,7 @@ const filteredStudentEvals = computed(() => {
 
 // Search & Filter state for Teacher Evaluations tab
 const teacherSearch = ref("");
+const teacherGrade = ref("all");
 const teacherSortBy = ref("name"); // 'name' | 'subject' | 'evals'
 
 const filteredTeacherEvals = computed(() => {
@@ -86,6 +92,9 @@ const filteredTeacherEvals = computed(() => {
 			return name.includes(q) || subj.includes(q);
 		});
 	}
+	if (teacherGrade.value && teacherGrade.value !== "all") {
+		list = list.filter((e) => matchesGradeFilter(e, teacherGrade.value));
+	}
 	if (teacherSortBy.value === "name") {
 		list.sort((a, b) => (a.lastname || "").localeCompare(b.lastname || ""));
 	} else if (teacherSortBy.value === "subject") {
@@ -95,6 +104,11 @@ const filteredTeacherEvals = computed(() => {
 	}
 	return list;
 });
+
+// Search & Filter state for Evaluate Teachers tab
+const evaluateSearch = ref("");
+const evaluateGrade = ref("all");
+const evaluateSortBy = ref("status"); // 'name' | 'subject' | 'status'
 
 const studentCoverageRate = computed(() => {
 	if (!teacherCount.value) return "0%";
@@ -141,7 +155,13 @@ async function fetchTeachers() {
 		},
 	});
 	if (result.success) {
-		teachers.value = result.teachers || [];
+		teachers.value = (result.teachers || []).map((t) => ({
+			...t,
+			is_elementary: Boolean(t.is_elementary),
+			is_jhs: Boolean(t.is_jhs),
+			isElementary: Boolean(t.is_elementary || t.isElementary),
+			isJhs: Boolean(t.is_jhs || t.isJhs),
+		}));
 		teacherCount.value = result.total || 0;
 		pendingCount.value = result.pendingCount || 0;
 		evaluatedCount.value = result.evaluatedCount || 0;
@@ -165,6 +185,10 @@ async function fetchStudentEvals() {
 			subject: e.teacher?.subject,
 			quarter: e.teacher?.quarter,
 			year: e.teacher?.year,
+			is_elementary: Boolean(e.teacher?.is_elementary),
+			is_jhs: Boolean(e.teacher?.is_jhs),
+			isElementary: Boolean(e.teacher?.is_elementary || e.teacher?.isElementary),
+			isJhs: Boolean(e.teacher?.is_jhs || e.teacher?.isJhs),
 			sentiment: e.teacher?.sentiment,
 		}));
 		studentTotal.value = result.total || 0;
@@ -189,6 +213,10 @@ async function fetchTeacherEvals() {
 			subject: e.teacher?.subject,
 			quarter: e.teacher?.quarter,
 			year: e.teacher?.year,
+			is_elementary: Boolean(e.teacher?.is_elementary),
+			is_jhs: Boolean(e.teacher?.is_jhs),
+			isElementary: Boolean(e.teacher?.is_elementary || e.teacher?.isElementary),
+			isJhs: Boolean(e.teacher?.is_jhs || e.teacher?.isJhs),
 			sentiment: e.teacher?.sentiment,
 		}));
 		teacherTotal.value = result.total || 0;
@@ -345,12 +373,29 @@ const totalTeacherPages = computed(() => Math.max(1, Math.ceil(teacherTotal.valu
 // Evaluate & Manage Teachers
 const sortedTeachers = computed(() => {
 	let list = [...teachers.value];
-	list.sort((a, b) => {
-		const aEval = a.evaluated === "evaluated" ? 1 : 0;
-		const bEval = b.evaluated === "evaluated" ? 1 : 0;
-		if (aEval !== bEval) return aEval - bEval;
-		return 0;
-	});
+	const q = evaluateSearch.value.trim().toLowerCase();
+	if (q) {
+		list = list.filter((t) => {
+			const name = `${t.firstname || ''} ${t.lastname || ''}`.toLowerCase();
+			const subj = (t.subject || '').toLowerCase();
+			return name.includes(q) || subj.includes(q);
+		});
+	}
+	if (evaluateGrade.value && evaluateGrade.value !== "all") {
+		list = list.filter((t) => matchesGradeFilter(t, evaluateGrade.value));
+	}
+	if (evaluateSortBy.value === "name") {
+		list.sort((a, b) => (a.lastname || "").localeCompare(b.lastname || ""));
+	} else if (evaluateSortBy.value === "subject") {
+		list.sort((a, b) => (a.subject || "").localeCompare(b.subject || ""));
+	} else if (evaluateSortBy.value === "status") {
+		list.sort((a, b) => {
+			const aEval = (a.evaluated === "evaluated" || a.evaluated === true || a.evaluated === 1 || a.evaluated === '1') ? 1 : 0;
+			const bEval = (b.evaluated === "evaluated" || b.evaluated === true || b.evaluated === 1 || b.evaluated === '1') ? 1 : 0;
+			if (aEval !== bEval) return aEval - bEval;
+			return (a.lastname || "").localeCompare(b.lastname || "");
+		});
+	}
 	return list;
 });
 const totalTeachersPages = computed(() => Math.max(1, Math.ceil(teacherCount.value / perPage)));
@@ -430,9 +475,14 @@ onUnmounted(() => {
               </div>
               <div>
                 <h3 class="text-lg font-bold text-slate-900">{{ selectedEval.firstname }} {{ selectedEval.lastname }}</h3>
-                <span class="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                  {{ detailType === 'student' ? 'Student Evaluation' : 'Teacher Evaluation' }}
-                </span>
+                <div class="flex flex-wrap items-center gap-2 mt-0.5">
+                  <span class="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                    {{ detailType === 'student' ? 'Student Evaluation' : 'Teacher Evaluation' }}
+                  </span>
+                  <span v-if="getTeacherGradeBadge(selectedEval)" class="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                    {{ getTeacherGradeBadge(selectedEval) }}
+                  </span>
+                </div>
               </div>
             </div>
             <button @click="closeDetail" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
@@ -702,6 +752,20 @@ onUnmounted(() => {
           </div>
 
           <div class="flex flex-wrap items-center gap-2 max-w-full">
+            <!-- Grade Filter -->
+            <div class="relative flex-1 sm:flex-none min-w-[140px]">
+              <GraduationCap class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="student-grade-filter" class="sr-only">Filter by Grade Level</label>
+              <select
+                id="student-grade-filter"
+                v-model="studentGrade"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option v-for="opt in GRADE_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Sort By -->
             <div class="relative flex-1 sm:flex-none">
               <ArrowUpDown class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
               <label htmlFor="student-eval-sort" class="sr-only">Sort student evaluations</label>
@@ -733,6 +797,9 @@ onUnmounted(() => {
                 <h3 class="truncate text-base font-bold text-slate-900">{{ ev.firstname }} {{ ev.lastname }}</h3>
                 <p class="truncate text-sm font-medium text-slate-500">{{ ev.subject }}</p>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <span v-if="getTeacherGradeBadge(ev)" class="inline-flex rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">
+                    {{ getTeacherGradeBadge(ev) }}
+                  </span>
                   <span class="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Q{{ ev.quarter }} {{ ev.year }}</span>
                   <span class="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{{ ev.eval_count }} {{ ev.eval_count === 1 ? 'eval' : 'evals' }}</span>
                   <span
@@ -780,6 +847,20 @@ onUnmounted(() => {
           </div>
 
           <div class="flex flex-wrap items-center gap-2 max-w-full">
+            <!-- Grade Filter -->
+            <div class="relative flex-1 sm:flex-none min-w-[140px]">
+              <GraduationCap class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="teacher-grade-filter" class="sr-only">Filter by Grade Level</label>
+              <select
+                id="teacher-grade-filter"
+                v-model="teacherGrade"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option v-for="opt in GRADE_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Sort By -->
             <div class="relative flex-1 sm:flex-none">
               <ArrowUpDown class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
               <label htmlFor="teacher-eval-sort" class="sr-only">Sort teacher evaluations</label>
@@ -811,6 +892,9 @@ onUnmounted(() => {
                 <h3 class="truncate text-base font-bold text-slate-900">{{ ev.firstname }} {{ ev.lastname }}</h3>
                 <p class="truncate text-sm font-medium text-slate-500">{{ ev.subject }}</p>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <span v-if="getTeacherGradeBadge(ev)" class="inline-flex rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    {{ getTeacherGradeBadge(ev) }}
+                  </span>
                   <span class="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Q{{ ev.quarter }} {{ ev.year }}</span>
                   <span class="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{{ ev.eval_count }} {{ ev.eval_count === 1 ? 'eval' : 'evals' }}</span>
                   <span
@@ -843,6 +927,51 @@ onUnmounted(() => {
 
       <!-- Evaluate Teachers -->
       <div v-if="activeTab === 'evaluate'" class="space-y-6">
+        <!-- Control Bar for Evaluate Teachers -->
+        <div class="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+          <div class="relative w-full sm:max-w-sm">
+            <Search class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+            <label htmlFor="evaluate-teacher-search" class="sr-only">Search teachers</label>
+            <input
+              id="evaluate-teacher-search"
+              type="search"
+              v-model="evaluateSearch"
+              placeholder="Search by teacher or subject..."
+              class="w-full rounded-xl border border-line bg-white py-2.5 pl-10 pr-3.5 text-sm text-ink transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 max-w-full">
+            <!-- Grade Filter -->
+            <div class="relative flex-1 sm:flex-none min-w-[140px]">
+              <GraduationCap class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="evaluate-grade-filter" class="sr-only">Filter by Grade Level</label>
+              <select
+                id="evaluate-grade-filter"
+                v-model="evaluateGrade"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option v-for="opt in GRADE_FILTER_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <!-- Sort By -->
+            <div class="relative flex-1 sm:flex-none">
+              <ArrowUpDown class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+              <label htmlFor="evaluate-teacher-sort" class="sr-only">Sort teachers</label>
+              <select
+                id="evaluate-teacher-sort"
+                v-model="evaluateSortBy"
+                class="w-full appearance-none rounded-xl border border-line bg-white py-2.5 pl-9 pr-8 text-xs sm:text-sm font-semibold text-ink-soft transition-colors hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/15"
+              >
+                <option value="status">Sort by Status</option>
+                <option value="name">Sort by Name</option>
+                <option value="subject">Sort by Subject</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div
             v-for="teacher in sortedTeachers"
@@ -874,7 +1003,10 @@ onUnmounted(() => {
               </span>
             </div>
             
-            <div class="mt-4 flex-1">
+            <div class="mt-4 flex flex-wrap items-center gap-2 flex-1">
+              <span v-if="getTeacherGradeBadge(teacher)" class="inline-flex rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 border border-indigo-100/60">
+                {{ getTeacherGradeBadge(teacher) }}
+              </span>
               <span v-if="teacher.quarter" class="inline-flex rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 border border-slate-100">
                 Q{{ teacher.quarter }} {{ teacher.year }}
               </span>

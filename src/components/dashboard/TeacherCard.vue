@@ -28,6 +28,11 @@
     </div>
 
     <dl class="mt-3.5 flex flex-wrap items-center gap-2 max-w-full">
+      <div v-if="teacherGradeBadge" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50/60 px-2.5 py-1 text-xs font-semibold text-indigo-700 max-w-full">
+        <dt class="sr-only">Grade Level</dt>
+        <GraduationCap class="h-3.5 w-3.5 flex-none text-indigo-600" aria-hidden="true" />
+        <dd class="truncate">{{ teacherGradeBadge }}</dd>
+      </div>
       <div class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-slate-50 px-2.5 py-1 text-xs font-medium text-ink-soft max-w-full">
         <dt class="sr-only">Evaluation period</dt>
         <CalendarDays class="h-3.5 w-3.5 flex-none text-ink-muted" aria-hidden="true" />
@@ -61,7 +66,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import { CalendarDays, CheckCircle2, Mail, SquarePen, UserRound } from '@lucide/vue'
+import { CalendarDays, CheckCircle2, Mail, SquarePen, UserRound, GraduationCap } from '@lucide/vue'
+import { getTeacherGradeBadge } from '../../utils/academic'
 
 const props = defineProps({
   teacher: { type: Object, required: true }
@@ -76,6 +82,8 @@ const teacherFullName = computed(() => {
   }
   return t.name || t.teacher_name || 'Unknown Teacher'
 })
+
+const teacherGradeBadge = computed(() => getTeacherGradeBadge(props.teacher))
 
 const isCompleted = computed(() => {
   const t = props.teacher
