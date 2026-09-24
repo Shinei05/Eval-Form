@@ -6,6 +6,7 @@ import LoadingOverlay from "../../components/LoadingOverlay.vue";
 import AppToast from "../../components/AppToast.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import { UploadCloud, FileText, Download, Info, X } from "@lucide/vue";
 
 const { isLoading } = useApi();
@@ -43,10 +44,11 @@ async function upload() {
 		form.append("action", "uploadCSV");
 		form.append("file", file.value);
 
-		const response = await fetch(API.csvImport, {
+		const response = await fetchWithTimeout(API.csvImport, {
 			method: "POST",
 			headers: { Authorization: `Bearer ${getToken()}` },
 			body: form,
+			timeout: 60000,
 		});
 
 		const result = await response.json();

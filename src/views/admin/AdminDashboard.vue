@@ -11,6 +11,7 @@ import Pagination from "../../components/Pagination.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import { matchesGradeFilter, getTeacherGradeBadge, GRADE_FILTER_OPTIONS } from "../../utils/academic";
 
 const router = useRouter();
@@ -306,13 +307,14 @@ function viewPerformance() {
 async function downloadCSV(url, filename, body = {}) {
 	try {
 		const token = getToken();
-		const response = await fetch(url, {
+		const response = await fetchWithTimeout(url, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				"Authorization": `Bearer ${token}`
 			},
-			body: JSON.stringify(body)
+			body: JSON.stringify(body),
+			timeout: 30000
 		});
 
 		if (!response.ok) {

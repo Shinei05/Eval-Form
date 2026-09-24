@@ -7,6 +7,7 @@ import AppToast from "../../components/AppToast.vue";
 import ConfirmModal from "../../components/ConfirmModal.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import { 
 	UploadCloud, Plus, Pencil, Trash2, X, CheckCircle2, Info, 
 	FileText, Loader2, Save, FileQuestion, PlusCircle, Check
@@ -151,10 +152,11 @@ async function handleUpload() {
 		form.append("version", uploadVersionName.value.trim());
 		form.append("file", uploadFile.value);
 
-		const response = await fetch(API.questionsUpload, {
+		const response = await fetchWithTimeout(API.questionsUpload, {
 			method: "POST",
 			headers: { Authorization: `Bearer ${getToken()}` },
 			body: form,
+			timeout: 60000,
 		});
 
 		const result = await response.json();
