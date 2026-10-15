@@ -100,6 +100,7 @@ describe("evaluations controller", () => {
 	describe("submitTeacher", () => {
 		it("inserts peer evaluation and answers", async () => {
 			pool.query
+				.mockResolvedValueOnce({ rows: [], rowCount: 0 }) // no previous evaluation
 				.mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }) // insert evaluation_p
 				.mockResolvedValueOnce({ rows: [], rowCount: 2 }); // batch insert answers
 
@@ -120,6 +121,7 @@ describe("evaluations controller", () => {
 
 		it("returns 500 when answer insert fails", async () => {
 			pool.query
+				.mockResolvedValueOnce({ rows: [], rowCount: 0 }) // no previous evaluation
 				.mockResolvedValueOnce({ rows: [{ id: 200 }], rowCount: 1 }) // insert eval ok
 				.mockRejectedValueOnce(new Error("answer insert failed")); // answers fail
 

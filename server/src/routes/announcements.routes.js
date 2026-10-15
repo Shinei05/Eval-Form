@@ -9,20 +9,22 @@ import {
 	markAllAsRead
 } from "../controllers/announcements.controller.js";
 import { authenticate } from "../middleware/auth.js";
+import { requireRole } from "../middleware/authorize.js";
 
 const router = express.Router();
+const adminOnly = requireRole("admin");
 
 // Get all announcements (teachers, students, admins can read)
 router.get("/", authenticate, getAnnouncements);
 
 // Create an announcement (admins only)
-router.post("/", authenticate, createAnnouncement);
+router.post("/", authenticate, adminOnly, createAnnouncement);
 
 // Delete an announcement (admins only)
-router.delete("/:id", authenticate, deleteAnnouncement);
+router.delete("/:id", authenticate, adminOnly, deleteAnnouncement);
 
 // Update an announcement (admins only)
-router.put("/:id", authenticate, updateAnnouncement);
+router.put("/:id", authenticate, adminOnly, updateAnnouncement);
 
 // Get feed for current user
 router.get("/feed", authenticate, getAnnouncementsFeed);

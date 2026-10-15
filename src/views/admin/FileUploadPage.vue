@@ -7,7 +7,7 @@ import AppToast from "../../components/AppToast.vue";
 import API from "../../utils/api";
 import { getToken } from "../../utils/auth";
 import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
-import { UploadCloud, FileText, Download, Info, X } from "@lucide/vue";
+import { UploadCloud, FileText, Download, Info, X, CheckCircle2, AlertTriangle, AlertCircle, Database } from "@lucide/vue";
 
 const { isLoading } = useApi();
 const { requireAuth } = useAuth();
@@ -20,6 +20,7 @@ function notify(msg, type = "info") {
 const file = ref(null);
 const loading = ref(false);
 const dragActive = ref(false);
+const uploadReport = ref(null);
 
 function onFileChange(e) {
 	file.value = e.target.files[0];
@@ -39,6 +40,9 @@ async function upload() {
 	}
 
 	loading.value = true;
+	const currentFileName = file.value.name;
+	const currentFileSize = file.value.size;
+
 	try {
 		const form = new FormData();
 		form.append("action", "uploadCSV");
@@ -53,7 +57,32 @@ async function upload() {
 
 		const result = await response.json();
 		if (result.success) {
-			notify("File uploaded successfully!", "success");
+			const total = result.total ?? (result.results ? result.results.length : 0);
+			const successful = result.successful ?? (result.results ? result.results.filter((r) => r.success).length : 0);
+			const failed = result.failed ?? (result.results ? result.results.filter((r) => !r.success).length : 0);
+			const failures = result.failures ?? (result.results ? result.results.filter((r) => !r.success) : []);
+
+			uploadReport.value = {
+				fileName: currentFileName,
+				fileSize: currentFileSize,
+				uploadedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+				total,
+				successful,
+				failed,
+				failures,
+				schema: result.schema || null,
+			};
+
+			if (total === 0) {
+				notify("The uploaded CSV file contains no data rows.", "warning");
+			} else if (successful === 0) {
+				notify(`Import failed: All ${failed} rows encountered errors. Check report below.`, "error");
+			} else if (failed > 0) {
+				notify(`Imported ${successful} of ${total} rows (${failed} rows skipped with errors).`, "warning");
+			} else {
+				notify(`All ${successful} rows imported successfully into database!`, "success");
+			}
+
 			file.value = null;
 		} else {
 			notify(result.message || "Upload failed", "error");
@@ -212,6 +241,129 @@ onMounted(() => {
 					<Download class="h-4 w-4" />
 					Download Example CSV
 				</a>
+			</div>
+		</div>
+
+		<!-- Upload Status Report Card -->
+		<div
+			v-if="uploadReport"
+			class="overflow-hidden rounded-2xl border bg-white shadow-sm transition-all"
+			:class="uploadReport.failed > 0 ? 'border-amber-200' : 'border-emerald-200'"
+		>
+			<!-- Card Header -->
+			<div
+				class="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4"
+				:class="uploadReport.failed > 0 ? 'bg-amber-50/60 border-amber-100' : 'bg-emerald-50/60 border-emerald-100'"
+			>
+				<div class="flex items-center gap-3">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl shadow-xs"
+						:class="uploadReport.failed > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'"
+					>
+						<AlertTriangle v-if="uploadReport.failed > 0" class="h-5 w-5" />
+						<CheckCircle2 v-else class="h-5 w-5" />
+					</div>
+					<div>
+						<h3 class="text-base font-bold text-slate-900">
+							{{ uploadReport.failed > 0 ? 'Upload Completed with Issues' : 'Upload Successful' }}
+						</h3>
+						<p class="text-xs text-slate-500">
+							File: <span class="font-medium text-slate-700">{{ uploadReport.fileName }}</span>
+							({{ (uploadReport.fileSize / 1024).toFixed(1) }} KB) &bull; at {{ uploadReport.uploadedAt }}
+						</p>
+					</div>
+				</div>
+
+				<div class="flex items-center gap-2">
+					<span
+						v-if="uploadReport.schema"
+						class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-2xs"
+					>
+						<Database class="h-3.5 w-3.5 text-indigo-500" />
+						Schema: <span class="font-semibold text-slate-900 font-mono">{{ uploadReport.schema }}</span>
+					</span>
+					<button
+						class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+						@click="uploadReport = null"
+						title="Dismiss report"
+					>
+						<X class="h-4 w-4" />
+					</button>
+				</div>
+			</div>
+
+			<!-- Stat Counters -->
+			<div class="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 p-6 bg-white">
+				<div class="px-4 py-2 text-center sm:text-left">
+					<p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Rows</p>
+					<p class="mt-1 text-2xl font-black text-slate-900">{{ uploadReport.total }}</p>
+					<p class="text-xs text-slate-500 mt-0.5">Rows in uploaded CSV</p>
+				</div>
+				<div class="px-4 py-2 text-center sm:text-left">
+					<p class="text-xs font-semibold uppercase tracking-wider text-emerald-600">Successfully Imported</p>
+					<p class="mt-1 text-2xl font-black text-emerald-600">{{ uploadReport.successful }}</p>
+					<p class="text-xs text-slate-500 mt-0.5">Inserted / updated in DB</p>
+				</div>
+				<div class="px-4 py-2 text-center sm:text-left">
+					<p
+						class="text-xs font-semibold uppercase tracking-wider"
+						:class="uploadReport.failed > 0 ? 'text-rose-600' : 'text-slate-400'"
+					>
+						Failed / Skipped
+					</p>
+					<p
+						class="mt-1 text-2xl font-black"
+						:class="uploadReport.failed > 0 ? 'text-rose-600' : 'text-slate-700'"
+					>
+						{{ uploadReport.failed }}
+					</p>
+					<p class="text-xs text-slate-500 mt-0.5">
+						{{ uploadReport.failed > 0 ? 'Rows with invalid fields or errors' : 'No errors encountered' }}
+					</p>
+				</div>
+			</div>
+
+			<!-- Failures Breakdown Table -->
+			<div v-if="uploadReport.failures && uploadReport.failures.length > 0" class="border-t border-slate-100 px-6 py-5 bg-slate-50/50">
+				<div class="mb-3 flex items-center justify-between">
+					<h4 class="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+						<AlertCircle class="h-4 w-4 text-rose-500" />
+						Failed Rows ({{ uploadReport.failures.length }})
+					</h4>
+					<span class="text-xs text-slate-500">Correct these in your CSV and re-upload</span>
+				</div>
+
+				<div class="overflow-x-auto rounded-xl border border-rose-200 bg-white shadow-2xs max-h-60 overflow-y-auto">
+					<table class="w-full text-left text-xs text-slate-600">
+						<thead class="bg-rose-50/70 text-[11px] font-bold uppercase tracking-wider text-rose-900 sticky top-0">
+							<tr>
+								<th class="px-4 py-2.5">Row</th>
+								<th class="px-4 py-2.5">Email / Identifier</th>
+								<th class="px-4 py-2.5">Error Reason</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-slate-100">
+							<tr
+								v-for="(fail, fIdx) in uploadReport.failures"
+								:key="fIdx"
+								class="hover:bg-rose-50/30 transition-colors"
+							>
+								<td class="px-4 py-2 font-mono font-semibold text-slate-800">#{{ fail.row }}</td>
+								<td class="px-4 py-2 font-medium text-slate-700">{{ fail.email || '—' }}</td>
+								<td class="px-4 py-2 text-rose-600 font-medium">{{ fail.message || 'Unknown validation error' }}</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- Success Footer Note -->
+			<div
+				v-else
+				class="border-t border-emerald-100 bg-emerald-50/40 px-6 py-3.5 text-xs text-emerald-800 flex items-center gap-2"
+			>
+				<CheckCircle2 class="h-4 w-4 text-emerald-600 shrink-0" />
+				<span>All student and teacher accounts and course assignments have been recorded in the database.</span>
 			</div>
 		</div>
 	</div>

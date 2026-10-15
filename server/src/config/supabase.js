@@ -2,6 +2,7 @@ import pg from "pg";
 
 // ─── PostgreSQL Pool via Supavisor session pooler ────────────
 const databaseUrl = process.env.DATABASE_URL;
+const dbSchema = process.env.DB_SCHEMA?.trim();
 
 if (!databaseUrl) {
 	console.error(
@@ -10,21 +11,19 @@ if (!databaseUrl) {
 	process.exit(1);
 }
 
+if (dbSchema && !/^[a-z_][a-z0-9_]*$/.test(dbSchema)) {
+	throw new Error("DB_SCHEMA must be a lowercase PostgreSQL schema name (letters, digits, underscores)");
+}
+
 const pool = new pg.Pool({
 	connectionString: databaseUrl,
+	// Apply the schema before any query runs. Do not fall back to public.
+	...(dbSchema ? { options: `-c search_path=${dbSchema}` } : {}),
 	ssl: { rejectUnauthorized: false },
 	max: 20,
 	idleTimeoutMillis: 30000,
 	connectionTimeoutMillis: 10000,
 });
-
-if (process.env.DB_SCHEMA) {
-	pool.on("connect", (client) => {
-		client.query(`SET search_path TO "${process.env.DB_SCHEMA}", public;`).catch((err) => {
-			console.error("Failed to set search_path:", err.message);
-		});
-	});
-}
 
 pool.on("error", (err) => {
 	console.error("Unexpected PG pool error:", err.message);

@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { jwtSecret } from "../config/jwt.js";
 
 /**
  * JWT authentication middleware.
@@ -17,7 +18,7 @@ export function authenticate(req, res, next) {
 	const token = authHeader.split(" ")[1];
 
 	try {
-		const decoded = jwt.verify(token, process.env.JWT_SECRET || "eval");
+		const decoded = jwt.verify(token, jwtSecret);
 		req.user = decoded;
 		next();
 	} catch (err) {

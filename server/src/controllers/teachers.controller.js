@@ -182,14 +182,6 @@ export async function listTeachers(req, res) {
 export async function listTeachersFaculty(req, res) {
 	try {
 		const evaluatorUserId = req.body.id;
-		let evaluatorTeacherId = null;
-		
-		if (evaluatorUserId) {
-			const { rows } = await pool.query("SELECT id FROM teachers WHERE usr_id = $1 LIMIT 1", [evaluatorUserId]);
-			if (rows.length > 0) {
-				evaluatorTeacherId = rows[0].id;
-			}
-		}
 
 		const usePaging = Object.prototype.hasOwnProperty.call(req.body, "page");
 
@@ -210,10 +202,10 @@ export async function listTeachersFaculty(req, res) {
 
 			// Check peer evaluation status
 			let evalSet = new Set();
-			if (evaluatorTeacherId) {
+			if (evaluatorUserId) {
 				const { rows: evals } = await pool.query(
 					"SELECT tcr_id FROM evaluation_p WHERE evt_id = $1",
-					[evaluatorTeacherId],
+					[evaluatorUserId],
 				);
 				evalSet = new Set(evals.map((e) => e.tcr_id));
 			}
@@ -267,8 +259,8 @@ export async function listTeachersFaculty(req, res) {
 		};
 
 		let evalJoin = "";
-		if (evaluatorTeacherId) {
-			const evalParam = addBaseParam(Number(evaluatorTeacherId));
+		if (evaluatorUserId) {
+			const evalParam = addBaseParam(Number(evaluatorUserId));
 			evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation_p WHERE evt_id = ${evalParam}) ev ON ev.tcr_id = t.id`;
 		} else {
 			evalJoin = `LEFT JOIN (SELECT DISTINCT tcr_id FROM evaluation_p WHERE 1=0) ev ON ev.tcr_id = t.id`;

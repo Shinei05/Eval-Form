@@ -409,9 +409,7 @@ async function updatePassword() {
       currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
       confirmPassword: passwordForm.confirmPassword,
-      email: user.value.email,
     },
-    auth: false,
   })
 
   if (result.success) {

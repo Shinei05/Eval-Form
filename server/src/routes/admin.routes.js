@@ -13,19 +13,21 @@ import {
 	getTeacherReportData,
 } from "../controllers/admin.controller.js";
 import { authenticate } from "../middleware/auth.js";
+import { requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const adminOnly = requireRole("admin");
 
-router.post("/csv-import", authenticate, upload.single("file"), csvImport);
-router.post("/subjects", authenticate, getSubjects);
+router.post("/csv-import", authenticate, adminOnly, upload.single("file"), csvImport);
+router.post("/subjects", authenticate, adminOnly, getSubjects);
 router.post("/schedule", authenticate, getSchedule);
-router.post("/set-schedule", authenticate, setSchedule);
-router.post("/reset-schedule", authenticate, resetSchedule);
-router.post("/ai-summary", authenticate, aiSummary);
-router.post("/export", authenticate, exportCSV);
-router.post("/export-teacher", authenticate, exportTeacherReport);
-router.post("/export-all-teachers", authenticate, exportAllTeachersReport);
-router.post("/teacher-report-data", authenticate, getTeacherReportData);
+router.post("/set-schedule", authenticate, adminOnly, setSchedule);
+router.post("/reset-schedule", authenticate, adminOnly, resetSchedule);
+router.post("/ai-summary", authenticate, adminOnly, aiSummary);
+router.post("/export", authenticate, adminOnly, exportCSV);
+router.post("/export-teacher", authenticate, adminOnly, exportTeacherReport);
+router.post("/export-all-teachers", authenticate, adminOnly, exportAllTeachersReport);
+router.post("/teacher-report-data", authenticate, adminOnly, getTeacherReportData);
 
 export default router;

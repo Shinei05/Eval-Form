@@ -27,7 +27,7 @@ router.post("/change-password", changePassword);
 router.post("/email-verify-code", emailVerifyCode);
 router.post("/email-verify-send", emailVerifySend);
 router.post("/verification-check", verificationCheck);
-router.post("/update-password", updatePassword);
+router.post("/update-password", authenticate, updatePassword);
 router.get("/profile", authenticate, getProfile);
 
 export default router;

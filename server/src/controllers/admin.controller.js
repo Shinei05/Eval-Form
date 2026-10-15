@@ -266,7 +266,20 @@ export async function csvImport(req, res) {
 			}
 		}
 
-		return res.json({ success: true, results });
+		const total = results.length;
+		const successful = results.filter((r) => r.success).length;
+		const failed = results.filter((r) => !r.success).length;
+		const failures = results.filter((r) => !r.success);
+
+		return res.json({
+			success: true,
+			total,
+			successful,
+			failed,
+			failures,
+			schema: process.env.DB_SCHEMA || "public",
+			results,
+		});
 	} catch (err) {
 		return res
 			.status(500)
