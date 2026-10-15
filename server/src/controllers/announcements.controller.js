@@ -36,7 +36,8 @@ export const getAnnouncementsFeed = async (req, res, next) => {
 // Create a new announcement
 export const createAnnouncement = async (req, res, next) => {
 	try {
-		const { title, content, author_id, category = 'GENERAL', is_pinned = false } = req.body;
+		const { title, content, category = 'GENERAL', is_pinned = false } = req.body;
+		const author_id = req.user.user_id;
 
 		if (!title || !content || !author_id) {
 			return res.status(400).json({ success: false, error: "Missing required fields" });

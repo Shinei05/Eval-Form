@@ -377,6 +377,7 @@ async function changePassword() {
       email: email.value,
       passwordss: newPassword.value,
       conpassword: confirmPassword.value,
+      code: otpValue.value,
     },
     auth: false
   })

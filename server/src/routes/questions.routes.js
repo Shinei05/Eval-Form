@@ -16,24 +16,26 @@ import {
 	uploadQuestionsDocx,
 } from "../controllers/questions.controller.js";
 import { authenticate } from "../middleware/auth.js";
+import { requireRole } from "../middleware/authorize.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const adminOnly = requireRole("admin");
 
 router.post("/student", getStudentQuestions);
 router.post("/student-all", getStudentQuestionsAll);
 router.post("/teacher", getTeacherQuestions);
 router.post("/teacher-all", getTeacherQuestionsAll);
-router.post("/update", updateStudentQuestion);
-router.post("/update-teacher", updateTeacherQuestion);
-router.post("/delete", deleteStudentQuestion);
-router.post("/delete-teacher", deleteTeacherQuestion);
-router.post("/add", addStudentQuestion);
-router.post("/add-teacher", addTeacherQuestion);
+router.post("/update", authenticate, adminOnly, updateStudentQuestion);
+router.post("/update-teacher", authenticate, adminOnly, updateTeacherQuestion);
+router.post("/delete", authenticate, adminOnly, deleteStudentQuestion);
+router.post("/delete-teacher", authenticate, adminOnly, deleteTeacherQuestion);
+router.post("/add", authenticate, adminOnly, addStudentQuestion);
+router.post("/add-teacher", authenticate, adminOnly, addTeacherQuestion);
 
 // New version management routes
-router.post("/versions", authenticate, getQuestionVersions);
-router.post("/set-active", authenticate, setActiveQuestionVersion);
-router.post("/upload", authenticate, upload.single("file"), uploadQuestionsDocx);
+router.post("/versions", authenticate, adminOnly, getQuestionVersions);
+router.post("/set-active", authenticate, adminOnly, setActiveQuestionVersion);
+router.post("/upload", authenticate, adminOnly, upload.single("file"), uploadQuestionsDocx);
 
 export default router;

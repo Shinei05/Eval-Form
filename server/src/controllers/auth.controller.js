@@ -4,8 +4,8 @@ import crypto from "crypto";
 import pool from "../config/supabase.js";
 import { getRandomString, getCurrentPeriod } from "../utils/helpers.js";
 import { sendEmail } from "../utils/email.js";
+import { jwtSecret } from "../config/jwt.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "eval";
 const JWT_EXPIRES_IN = Number(process.env.JWT_EXPIRES_IN) || 3600;
 
 //  Fetch current user profile
@@ -197,7 +197,7 @@ export async function loginStudent(req, res) {
 				email: user.email,
 				iat: Math.floor(Date.now() / 1000),
 			},
-			JWT_SECRET,
+			jwtSecret,
 			{ expiresIn: JWT_EXPIRES_IN },
 		);
 
@@ -276,7 +276,7 @@ export async function loginTeacher(req, res) {
 				email: user.email,
 				iat: Math.floor(Date.now() / 1000),
 			},
-			JWT_SECRET,
+			jwtSecret,
 			{ expiresIn: JWT_EXPIRES_IN },
 		);
 
@@ -346,7 +346,7 @@ export async function loginAdmin(req, res) {
 				email: user.email,
 				iat: Math.floor(Date.now() / 1000),
 			},
-			JWT_SECRET,
+			jwtSecret,
 			{ expiresIn: JWT_EXPIRES_IN },
 		);
 
@@ -464,7 +464,7 @@ export async function verifyResetCode(req, res) {
 //  Change password
 export async function changePassword(req, res) {
 	try {
-		const { passwordss, conpassword, email } = req.body;
+		const { passwordss, conpassword, email, code } = req.body;
 
 		if (passwordss !== conpassword) {
 			return res
@@ -476,19 +476,22 @@ export async function changePassword(req, res) {
 		if (!passwordRegex.test(passwordss)) {
 			return res.status(400).json({ success: false, error: "Password must be at least 8 characters long and include numbers and symbols." });
 		}
+		if (!email || !/^\d{6}$/.test(String(code || ""))) {
+			return res.status(400).json({ success: false, error: "A valid reset code is required." });
+		}
 
 		const hash = await bcrypt.hash(passwordss, 10);
 		const newCode = getRandomString(10);
 
 		const { rowCount } = await pool.query(
-			"UPDATE users SET password = $1, reset = $2, is_verified = true WHERE email = $3",
-			[hash, newCode, email],
+			"UPDATE users SET password = $1, reset = $2, is_verified = true WHERE email = $3 AND reset = $4 AND is_deleted = false",
+			[hash, newCode, email, code],
 		);
 
 		if (rowCount === 0) {
 			return res
-				.status(500)
-				.json({ success: false, error: "User not found" });
+				.status(400)
+					.json({ success: false, error: "Invalid or expired reset code" });
 		}
 
 		return res.json({ success: true });
@@ -502,7 +505,7 @@ export async function changePassword(req, res) {
 // Update password (with current password verification)
 export async function updatePassword(req, res) {
 	try {
-		const { email, currentPassword, newPassword, confirmPassword } = req.body;
+		const { currentPassword, newPassword, confirmPassword } = req.body;
 
 		if (newPassword !== confirmPassword) {
 			return res.status(400).json({ success: false, error: "Passwords do not match." });
@@ -514,8 +517,8 @@ export async function updatePassword(req, res) {
 		}
 
 		const { rows } = await pool.query(
-			"SELECT id, password FROM users WHERE email = $1 LIMIT 1",
-			[email]
+			"SELECT id, password FROM users WHERE id = $1 AND is_deleted = false LIMIT 1",
+			[req.user.user_id]
 		);
 		const user = rows[0];
 

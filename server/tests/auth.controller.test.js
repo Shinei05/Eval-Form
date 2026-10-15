@@ -19,6 +19,7 @@ vi.mock("bcryptjs", () => ({
 // Mock helpers & email
 vi.mock("../src/utils/helpers.js", () => ({
 	getRandomString: vi.fn(() => "TESTRANDOM"),
+	getCurrentPeriod: vi.fn(() => 1),
 }));
 
 vi.mock("../src/utils/email.js", () => ({
@@ -28,6 +29,7 @@ vi.mock("../src/utils/email.js", () => ({
 import pool from "../src/config/supabase.js";
 import bcrypt from "bcryptjs";
 import { sendEmail } from "../src/utils/email.js";
+import { getCurrentPeriod, getRandomString } from "../src/utils/helpers.js";
 
 import {
 	loginStudent,
@@ -37,6 +39,7 @@ import {
 	resetPassword,
 	verifyResetCode,
 	changePassword,
+	updatePassword,
 	emailVerifyCode,
 	emailVerifySend,
 	verificationCheck,
@@ -44,7 +47,12 @@ import {
 
 describe("auth controller", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		vi.resetAllMocks();
+		bcrypt.compare.mockResolvedValue(true);
+		bcrypt.hash.mockResolvedValue("new-hash");
+		sendEmail.mockResolvedValue(true);
+		getCurrentPeriod.mockReturnValue(1);
+		getRandomString.mockReturnValue("TESTRANDOM");
 	});
 
 	// ───────────────────────────── loginStudent ─────────────────────────────
@@ -63,6 +71,7 @@ describe("auth controller", () => {
 
 			pool.query
 				.mockResolvedValueOnce({ rows: [userRow], rowCount: 1 })
+				.mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // active schedule
 				.mockResolvedValueOnce({ rows: [studentRow], rowCount: 1 });
 
 			bcrypt.compare.mockResolvedValue(true);
@@ -77,7 +86,7 @@ describe("auth controller", () => {
 			expect(res._json.success).toBe(true);
 			expect(res._json.token).toBeDefined();
 			expect(res._json.userData.email).toBe("s@test.com");
-			expect(res._json.userData.fullname).toBe("John");
+			expect(res._json.userData.fullname).toBe("John Doe");
 			expect(res._json.userData.lastname).toBe("Doe");
 		});
 
@@ -92,7 +101,7 @@ describe("auth controller", () => {
 			await loginStudent(req, res);
 
 			expect(res._status).toBe(400);
-			expect(res._json.error).toBe("Email not found");
+			expect(res._json.error).toBe("Invalid Credentials");
 		});
 
 		it("returns 400 when password is wrong", async () => {
@@ -130,6 +139,7 @@ describe("auth controller", () => {
 
 			pool.query
 				.mockResolvedValueOnce({ rows: [userRow], rowCount: 1 })
+				.mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // active schedule
 				.mockResolvedValueOnce({ rows: [teacherRow], rowCount: 1 });
 			bcrypt.compare.mockResolvedValue(true);
 
@@ -142,7 +152,7 @@ describe("auth controller", () => {
 
 			expect(res._json.success).toBe(true);
 			expect(res._json.token).toBeDefined();
-			expect(res._json.userData.fullname).toBe("Jane");
+			expect(res._json.userData.fullname).toBe("Jane Smith");
 		});
 
 		it("returns 400 when teacher record not found", async () => {
@@ -150,6 +160,7 @@ describe("auth controller", () => {
 
 			pool.query
 				.mockResolvedValueOnce({ rows: [userRow], rowCount: 1 })
+				.mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 }) // active schedule
 				.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 			bcrypt.compare.mockResolvedValue(true);
 
@@ -188,7 +199,7 @@ describe("auth controller", () => {
 			await loginAdmin(req, res);
 
 			expect(res._json.success).toBe(true);
-			expect(res._json.userData.fullname).toBe("Admin");
+			expect(res._json.userData.fullname).toBe("Admin User");
 		});
 	});
 
@@ -303,9 +314,10 @@ describe("auth controller", () => {
 
 			const req = mockReq({
 				body: {
-					passwordss: "newpass",
-					conpassword: "newpass",
+					passwordss: "newpass1!",
+					conpassword: "newpass1!",
 					email: "u@t.com",
+					code: "123456",
 				},
 			});
 			const res = mockRes();
@@ -313,6 +325,27 @@ describe("auth controller", () => {
 			await changePassword(req, res);
 
 			expect(res._json.success).toBe(true);
+			expect(pool.query).toHaveBeenCalledWith(
+				expect.stringContaining("AND reset = $4"),
+				["new-hash", "TESTRANDOM", "u@t.com", "123456"],
+			);
+		});
+
+		it("rejects a reset without a code", async () => {
+			const req = mockReq({ body: { email: "u@t.com", passwordss: "newpass1!", conpassword: "newpass1!" } });
+			const res = mockRes();
+			await changePassword(req, res);
+			expect(res._status).toBe(400);
+			expect(pool.query).not.toHaveBeenCalled();
+		});
+
+		it("rejects a reset with the wrong code", async () => {
+			pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+			const req = mockReq({ body: { email: "u@t.com", code: "123456", passwordss: "newpass1!", conpassword: "newpass1!" } });
+			const res = mockRes();
+			await changePassword(req, res);
+			expect(res._status).toBe(400);
+			expect(res._json.error).toBe("Invalid or expired reset code");
 		});
 
 		it("returns 400 when passwords don't match", async () => {
@@ -329,6 +362,32 @@ describe("auth controller", () => {
 
 			expect(res.status).toHaveBeenCalledWith(400);
 			expect(res._json.message).toBe("Password mismatched");
+		});
+	});
+
+	// ───────────────────────────── emailVerifyCode ──────────────────────────
+	describe("updatePassword", () => {
+		it("loads the account from the signed-in identity", async () => {
+			pool.query
+				.mockResolvedValueOnce({ rows: [{ id: 7, password: "old-hash" }] })
+				.mockResolvedValueOnce({ rowCount: 1 });
+			const req = mockReq({
+				user: { user_id: 7 },
+				body: { email: "another@test.com", currentPassword: "old", newPassword: "newpass1!", confirmPassword: "newpass1!" },
+			});
+			const res = mockRes();
+			await updatePassword(req, res);
+			expect(res._json.success).toBe(true);
+			expect(pool.query).toHaveBeenNthCalledWith(
+				1,
+				expect.stringContaining("WHERE id = $1"),
+				[7],
+			);
+			expect(pool.query).toHaveBeenNthCalledWith(
+				2,
+				expect.stringContaining("WHERE id = $2"),
+				["new-hash", 7],
+			);
 		});
 	});
 
